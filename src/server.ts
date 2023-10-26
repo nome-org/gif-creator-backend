@@ -1,14 +1,15 @@
-const http = require("http");
+import { config as loadEnvVars } from "dotenv";
 
-const express = require("express");
-const { PrismaClient } = require("@prisma/client");
-const needle = require("needle");
+import express from "express";
+import { PrismaClient } from "@prisma/client";
+import needle from "needle";
+import ErrorResponse from "./lib/error-response";
 
 const app = express();
 const prisma = new PrismaClient();
 
 //load env
-require("./lib/getenv")();
+loadEnvVars();
 
 app.use(express.json());
 //cors
@@ -19,19 +20,35 @@ app.use((_, res, next) => {
     );
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "*");
-    res.setHeader("Access-Control-Allow-Credentials", true);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Access-Control-Allow-Max-Age", 24 * 60 * 60);
     next();
 });
 
+const buildOrdinalsBotError = (
+    body:
+        | {
+              status: "error";
+              error: string;
+              reason: never;
+          }
+        | {
+              status: "error";
+              error: never;
+              reason: string;
+          }
+) => {
+    throw new ErrorResponse(body.error || body.reason, 500);
+};
+
 //prepare local server
-const server = http.createServer(app);
 
 app.get("/price", async (req, res, next) => {
     try {
         let { size, fee, count, rareSats } = req.query;
-        let res = await needle.get(
-            `https://api.ordinalsbot.com/price?size=${size}&fee=${fee}&count=${count}`,
+        let priceResponse = await needle(
+            "get",
+            `${process.env.ORDINALS_BOT_API_BASE_URL}/price?size=${size}&fee=${fee}&count=${count}`,
             { json: true, headers: { Accept: "application/json" } }
         );
 
@@ -43,8 +60,8 @@ app.get("/price", async (req, res, next) => {
         //     "serviceFee": 100945, // total service fee taken by ordinalsbot.com
         //     "totalFee": 110403 // total amount to be paid by the user
         // }
-        if (res.status === "ok") {
-            let fee = res.totalFee;
+        if (priceResponse.body.status === "ok") {
+            let fee = priceResponse.body.totalFee;
             return res.status(200).json({
                 message: "Price calculated",
                 data: {
@@ -53,9 +70,7 @@ app.get("/price", async (req, res, next) => {
                 success: true,
             });
         } else {
-            let e = new Error(res.error);
-            e.status = 500;
-            throw e;
+            buildOrdinalsBotError(priceResponse.body);
         }
     } catch (e) {
         next(e);
@@ -110,16 +125,22 @@ app.post("/inscribe", async (req, res, next) => {
             // additionalFee: proccess.env.REFERRAL_FEE
             webhookUrl: `https://...../inscribe/update-status`,
         };
-        let res = await needle.post("https://api.ordinalsbot.com/order", data, {
-            json: true,
-            headers: { Accept: "application/json" },
-        });
-        if (res?.status === "ok") {
+        let orderResponse = await needle(
+            "post",
+            `${process.env.ORDINALS_BOT_API_BASE_URL}/order`,
+            data,
+            {
+                json: true,
+                headers: { Accept: "application/json" },
+            }
+        );
+        if (orderResponse.body.status === "ok") {
             //successful order
             //save to the db
             let newOrder = await prisma.order.create({
                 data: {
                     address: receiverAddress,
+                    pid: orderResponse.body.charge.id,
                 },
             });
             console.log({ newOrder });
@@ -132,9 +153,7 @@ app.post("/inscribe", async (req, res, next) => {
             });
         }
         //an error occurred
-        let e = new Error(res.error);
-        e.status = 500;
-        throw e;
+        buildOrdinalsBotError(orderResponse.body);
 
         //success response
         // let re = {
@@ -177,17 +196,18 @@ app.post("/inscribe/update-status", async (req, res, next) => {
         orderId: payload.id,
         address: "",
     };
-    let response = await needle.post(
-        "https://api.ordinalsbot.com/address",
+    let response = await needle(
+        "post",
+        `${process.env.ORDINALS_BOT_API_BASE_URL}/address`,
         data,
         { json: true, headers: { Accept: "application/json" } }
     );
-    if (response.status === "ok") {
+    if (response.body.status === "ok") {
         //successfully done
         //update user order
         let update = await prisma.order.update({
             where: {
-                address: "",
+                pid: payload.id,
             },
             data: {
                 pid: payload.id,
@@ -197,38 +217,29 @@ app.post("/inscribe/update-status", async (req, res, next) => {
 
         //inscribe the html file with the payload.id
     } else {
-        let e = new Error(response.error);
-        e.status = 500;
-        throw e;
+        buildOrdinalsBotError(response.body);
     }
 });
 
 //wayward route handler
 app.use("*", (req, res, next) => {
-    let e = new Error("Page not found.\n Invalid API Route");
-    e.status = 404;
+    let e = new ErrorResponse("Page not found.\n Invalid API Route", 404);
     next(e);
 });
 
 //general error handler
-app.use((error, req, res, next) => {
-    return res.status(error.status).json({
-        message: error.message,
-        success: false,
-    });
-});
-
-server.on("error", async (err) => {
+app.use(
+    (error: ErrorResponse, _req: express.Request, res: express.Response) => {
+        return res.status(error.statusCode).json({
+            message: error.message,
+            success: false,
+        });
+    }
+);
+const PORT = Number(process.env.PORT || 3000);
+app.listen(PORT, async () => {
+    console.log(`Server has started on http://localhost:${PORT}`);
+}).on("error", async (err) => {
     console.log({ err });
-    console.log("FROM ERROR SERVER EVENT EMITTER");
-    await prisma.$disconnect();
-});
-
-server.listen(process.env.PORT, process.env.HOST, async () => {
-    await prisma.$connect();
-    console.log(
-        `Server has started on http://${server.address().address}:${
-            server.address().port
-        }`
-    );
+    console.log("FROM ERROR APP EVENT EMITTER");
 });
