@@ -1,13 +1,11 @@
 const http = require("http");
 
-
 const express = require("express");
-const {PrismaClient} = require("@prisma/client");
+const { PrismaClient } = require("@prisma/client");
 const needle = require("needle");
 
 const app = express();
 const prisma = new PrismaClient();
-
 
 //load env
 require("./lib/getenv")();
@@ -15,24 +13,27 @@ require("./lib/getenv")();
 app.use(express.json());
 //cors
 app.use((_, res, next) => {
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    res.setHeader(
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    );
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "*");
     res.setHeader("Access-Control-Allow-Credentials", true);
     res.setHeader("Access-Control-Allow-Max-Age", 24 * 60 * 60);
     next();
-})
+});
 
 //prepare local server
 const server = http.createServer(app);
 
-
-
 app.get("/price", async (req, res, next) => {
-    try{
-        let {size, fee, count, rareSats} = req.query;
-        let res = await needle.get(`https://api.ordinalsbot.com/price?size=${size}&fee=${fee}&count=${count}`,
-         {json: true, headers: {"Accept": "application/json"}});
+    try {
+        let { size, fee, count, rareSats } = req.query;
+        let res = await needle.get(
+            `https://api.ordinalsbot.com/price?size=${size}&fee=${fee}&count=${count}`,
+            { json: true, headers: { Accept: "application/json" } }
+        );
 
         //possible response
         // {
@@ -42,49 +43,62 @@ app.get("/price", async (req, res, next) => {
         //     "serviceFee": 100945, // total service fee taken by ordinalsbot.com
         //     "totalFee": 110403 // total amount to be paid by the user
         // }
-        if(res.status === 'ok'){
+        if (res.status === "ok") {
             let fee = res.totalFee;
             return res.status(200).json({
-                message: 'Price calculated',
+                message: "Price calculated",
                 data: {
-                    fee
+                    fee,
                 },
-                success: true
-            })
-        }else {
+                success: true,
+            });
+        } else {
             let e = new Error(res.error);
             e.status = 500;
             throw e;
         }
-    }catch(e){next(e)}
-})
+    } catch (e) {
+        next(e);
+    }
+});
 
-app.get("/:address/status", async(req, res, next) => {
-    try{
+app.get("/:address/status", async (req, res, next) => {
+    try {
         //first get the user address
         let address = req.params.address;
 
         //then check if the user has an order already and send back those details
         let orders = await prisma.order.findMany({
             where: {
-                address
-            }
+                address,
+            },
         });
 
         return res.status(200).json({
-            message: 'Orders fetched successfully',
+            message: "Orders fetched successfully",
             data: orders,
-            success: true
+            success: true,
         });
-    }catch(e){next(e)}
-})
-
+    } catch (e) {
+        next(e);
+    }
+});
 
 app.post("/inscribe", async (req, res, next) => {
-    try{
-        let {files, qty, rarity, receiverAddress} = req.body
+    try {
+        let { files, qty, rarity, receiverAddress } = req.body;
         //common values for rarity
-        let available_rarity = ["2009", "2010", "2011", "block78", "pizza", "uncommon", "black", "vintage", "random"];
+        let available_rarity = [
+            "2009",
+            "2010",
+            "2011",
+            "block78",
+            "pizza",
+            "uncommon",
+            "black",
+            "vintage",
+            "random",
+        ];
 
         let data = {
             files: [],
@@ -94,25 +108,28 @@ app.post("/inscribe", async (req, res, next) => {
             lowPostage: true,
             // referral: process.env.REFERRAL_CODE
             // additionalFee: proccess.env.REFERRAL_FEE
-            webhookUrl: `https://...../inscribe/update-status`
-        }
-        let res = await needle.post("https://api.ordinalsbot.com/order", data, {json: true, headers: {"Accept": "application/json"}});
-        if(res?.status === 'ok'){
+            webhookUrl: `https://...../inscribe/update-status`,
+        };
+        let res = await needle.post("https://api.ordinalsbot.com/order", data, {
+            json: true,
+            headers: { Accept: "application/json" },
+        });
+        if (res?.status === "ok") {
             //successful order
             //save to the db
             let newOrder = await prisma.order.create({
                 data: {
-                    address: receiverAddress
-                }
-            })
-            console.log({newOrder});
+                    address: receiverAddress,
+                },
+            });
+            console.log({ newOrder });
 
             //send response to client
             return res.status(201).json({
-                message: 'Inscribe Order pending',
+                message: "Inscribe Order pending",
                 data: newOrder,
-                success: true
-            })
+                success: true,
+            });
         }
         //an error occurred
         let e = new Error(res.error);
@@ -139,11 +156,10 @@ app.post("/inscribe", async (req, res, next) => {
         //     createdAt: 1675785959855, // timestamp in ms,
         // }
         // console.log({res, re});
-    }catch(e){
+    } catch (e) {
         next(e);
     }
 });
-
 
 //webhook which receives the inscribe order status
 app.post("/inscribe/update-status", async (req, res, next) => {
@@ -159,53 +175,60 @@ app.post("/inscribe/update-status", async (req, res, next) => {
     //update receiverwallet address
     let data = {
         orderId: payload.id,
-        address: ''
-    }
-    let res = await needle.post("https://api.ordinalsbot.com/address", data, {json: true, headers: {"Accept": "application/json"}});
-    if(res.status === 'ok'){
+        address: "",
+    };
+    let response = await needle.post(
+        "https://api.ordinalsbot.com/address",
+        data,
+        { json: true, headers: { Accept: "application/json" } }
+    );
+    if (response.status === "ok") {
         //successfully done
         //update user order
         let update = await prisma.order.update({
             where: {
-                address: ''
+                address: "",
             },
             data: {
                 pid: payload.id,
-                status: "INSCRIBED"
-            }
-        })
+                status: "INSCRIBED",
+            },
+        });
 
         //inscribe the html file with the payload.id
-    }else {
-        let e = new Error(res.error);
+    } else {
+        let e = new Error(response.error);
         e.status = 500;
         throw e;
     }
-})
-
+});
 
 //wayward route handler
 app.use("*", (req, res, next) => {
     let e = new Error("Page not found.\n Invalid API Route");
     e.status = 404;
     next(e);
-})
+});
 
 //general error handler
 app.use((error, req, res, next) => {
     return res.status(error.status).json({
         message: error.message,
-        success: false
-    })
-})
+        success: false,
+    });
+});
 
-server.on("error", async err => {
-    console.log({err});
+server.on("error", async (err) => {
+    console.log({ err });
     console.log("FROM ERROR SERVER EVENT EMITTER");
     await prisma.$disconnect();
-})
+});
 
 server.listen(process.env.PORT, process.env.HOST, async () => {
     await prisma.$connect();
-    console.log(`Server has started on http://${server.address().address}:${server.address().port}`);
-})
+    console.log(
+        `Server has started on http://${server.address().address}:${
+            server.address().port
+        }`
+    );
+});
