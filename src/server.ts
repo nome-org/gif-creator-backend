@@ -180,49 +180,53 @@ app.post(
 
 //webhook which receives the inscribe order status
 app.post("/inscribe/update-status/:token", async (req, res, next) => {
-    //once it gets here
-    let payload = req.body as OrdinalsBotWebhookPayload;
-    const token = req.params.token;
-    // {
-    //     id: xxx, => orderId
-    //     index: 0, => index of file in the original order request file array
-    //     file: {...} => file object for the update
-    //     tx: {reveal, inscription, commit} => inscription related transaction data
-    // }
+    try {
+        //once it gets here
+        let payload = req.body as OrdinalsBotWebhookPayload;
+        const token = req.params.token;
+        // {
+        //     id: xxx, => orderId
+        //     index: 0, => index of file in the original order request file array
+        //     file: {...} => file object for the update
+        //     tx: {reveal, inscription, commit} => inscription related transaction data
+        // }
 
-    const existingOrder = await prisma.order.findFirst({
-        where: {
-            update_token: token,
-            pid: payload.id,
-        },
-        select: safeOrderFields,
-    });
+        const existingOrder = await prisma.order.findFirst({
+            where: {
+                update_token: token,
+                pid: payload.id,
+            },
+            select: safeOrderFields,
+        });
 
-    if (!existingOrder) {
-        throw new ErrorResponse("Invalid order token", 401);
+        if (!existingOrder) {
+            throw new ErrorResponse("Invalid order token", 401);
+        }
+
+        if (existingOrder.status === Status.INSCRIBED) {
+            throw new ErrorResponse("Order already inscribed", 400);
+        }
+
+        let update = await prisma.order.update({
+            where: {
+                pid: payload.id,
+            },
+            data: {
+                status: "INSCRIBED",
+            },
+            select: safeOrderFields,
+        });
+
+        return res.status(200).json({
+            message: "Order updated successfully",
+            data: update,
+            success: true,
+        });
+
+        //inscribe the html file with the payload.id
+    } catch (e) {
+        next(e);
     }
-
-    if (existingOrder.status === Status.INSCRIBED) {
-        throw new ErrorResponse("Order already inscribed", 400);
-    }
-
-    let update = await prisma.order.update({
-        where: {
-            pid: payload.id,
-        },
-        data: {
-            status: "INSCRIBED",
-        },
-        select: safeOrderFields,
-    });
-
-    return res.status(200).json({
-        message: "Order updated successfully",
-        data: update,
-        success: true,
-    });
-
-    //inscribe the html file with the payload.id
 });
 
 //wayward route handler
@@ -237,7 +241,7 @@ app.use(function errorHandler(
     res: Response,
     next: NextFunction
 ) {
-    console.log({ date: new Date(), error, req, res, next });
+    console.log({ date: new Date(), error });
     return res.status(error.statusCode).json({
         message: error.message,
         success: false,
