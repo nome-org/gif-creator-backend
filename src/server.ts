@@ -1,6 +1,7 @@
 import { config as loadEnvVars } from "dotenv";
 
 import express from "express";
+import type {Request, Response, NextFunction} from "express";
 
 import needle from "needle";
 import ErrorResponse from "./lib/error-response";
@@ -44,7 +45,7 @@ const buildOrdinalsBotError = (
 
 //prepare local server
 
-app.get("/price", async (req, res, next) => {
+app.get("/price", async (req: Request, res: Response, next: NextFunction) => {
     try {
         let { size, fee, count, rareSats } = req.query;
         let priceResponse = await needle(
@@ -78,7 +79,7 @@ app.get("/price", async (req, res, next) => {
     }
 });
 
-app.get("/:address/status", async (req, res, next) => {
+app.get("/:address/status", async (req: Request, res: Response, next: NextFunction) => {
     try {
         //first get the user address
         let address = req.params.address;
@@ -100,10 +101,9 @@ app.get("/:address/status", async (req, res, next) => {
     }
 });
 
-app.post("/inscribe", async (req, res, next) => {
+app.post("/inscribe", async (req: Request, res: Response, next: NextFunction) => {
     try {
         let { files, rarity, receiverAddress } = req.body;
-        //common values for rarity
 
         if (!files.length) {
             throw new ErrorResponse("No files provided", 400);
@@ -146,7 +146,6 @@ app.post("/inscribe", async (req, res, next) => {
             `${process.env.ORDINALS_BOT_API_BASE_URL}/order`,
             data,
             {
-                json: true,
                 headers: {
                     Accept: "application/json",
                     "Content-Type": "application/json",
@@ -229,7 +228,7 @@ app.post("/inscribe/update-status", async (req, res, next) => {
                 pid: payload.id,
             },
             data: {
-                pid: payload.id,
+                // pid: payload.id,
                 status: "INSCRIBED",
             },
         });
@@ -248,11 +247,11 @@ app.use("*", (_req, _res, next) => {
 //general error handler
 app.use(function errorHandler(
     error: ErrorResponse,
-    _req: express.Request,
-    res: express.Response,
-    next: unknown
+    req: Request,
+    res: Response,
+    next: NextFunction
 ) {
-    console.log({ error, _req, res, next });
+    console.log({date: new Date(), error, req, res, next });
     return res.status(error.statusCode).json({
         message: error.message,
         success: false,
