@@ -24,6 +24,7 @@ model Order {
   // taproot address receiving the ordinal
   address          String
   transaction_data String?  @db.VarChar(2048)
+  update_token     String   @unique @db.VarChar(255)
   status           Status   @default(PENDING)
 
   @@map("orders")

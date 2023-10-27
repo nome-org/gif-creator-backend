@@ -1,17 +1,35 @@
 import { config as loadEnvVars } from "dotenv";
 
 import express from "express";
-import type {Request, Response, NextFunction} from "express";
+import type { Request, Response, NextFunction } from "express";
 
 import needle from "needle";
 import ErrorResponse from "./lib/error-response";
 
 import prisma from "./lib/prisma-client";
 import { available_rarity } from "./constants/rarity";
+import { v4 } from "uuid";
+import { validateOrderData } from "./lib/validation/orders";
+import { Status } from "@prisma/client";
+import {
+    OrdinalsBotCreateOrderResponse,
+    OrdinalsBotErrorResponse,
+    OrdinalsBotWebhookPayload,
+} from "./types/ordinals-bot";
 const app = express();
 
 //load env
 loadEnvVars();
+
+const safeOrderFields = {
+    address: true,
+    created_at: true,
+    pid: true,
+    status: true,
+    id: true,
+    transaction_data: true,
+    updated_at: true,
+};
 
 app.use(express.json());
 //cors
@@ -27,19 +45,7 @@ app.use((_, res, next) => {
     next();
 });
 
-const buildOrdinalsBotError = (
-    body:
-        | {
-              status: "error";
-              error: string;
-              reason: never;
-          }
-        | {
-              status: "error";
-              error: never;
-              reason: string;
-          }
-) => {
+const buildOrdinalsBotError = (body: OrdinalsBotErrorResponse) => {
     return new ErrorResponse(body.error || body.reason, 500);
 };
 
@@ -79,129 +85,104 @@ app.get("/price", async (req: Request, res: Response, next: NextFunction) => {
     }
 });
 
-app.get("/:address/status", async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        //first get the user address
-        let address = req.params.address;
+app.get(
+    "/:address/status",
+    async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            //first get the user address
+            let address = req.params.address;
 
-        //then check if the user has an order already and send back those details
-        let orders = await prisma.order.findMany({
-            where: {
-                address,
-            },
-        });
-
-        return res.status(200).json({
-            message: "Orders fetched successfully",
-            data: orders,
-            success: true,
-        });
-    } catch (e) {
-        next(e);
-    }
-});
-
-app.post("/inscribe", async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        let { files, rarity, receiverAddress } = req.body;
-
-        if (!files.length) {
-            throw new ErrorResponse("No files provided", 400);
-        }
-
-        if (!receiverAddress) {
-            throw new ErrorResponse("No receiver address provided", 400);
-        }
-
-        if (!available_rarity.includes(rarity)) {
-            throw new ErrorResponse("Invalid rarity provided", 400);
-        }
-        // check if files are valid format
-        const areFilesValid = files.every((file: any) => {
-            return (
-                file.name &&
-                file.type &&
-                file.dataURL &&
-                file.size &&
-                file.size <= 5000000
-            );
-        });
-
-        if (!areFilesValid) {
-            throw new ErrorResponse("Invalid file format", 400);
-        }
-
-        let data = {
-            files,
-            receiveAddress: receiverAddress,
-            fee: process.env.MINING_FEE,
-            rareSats: rarity,
-            lowPostage: true,
-            // referral: process.env.REFERRAL_CODE
-            // additionalFee: proccess.env.REFERRAL_FEE
-            webhookUrl: `https://...../inscribe/update-status`,
-        };
-        let orderResponse = await needle(
-            "post",
-            `${process.env.ORDINALS_BOT_API_BASE_URL}/order`,
-            data,
-            {
-                headers: {
-                    Accept: "application/json",
-                    "Content-Type": "application/json",
+            //then check if the user has an order already and send back those details
+            let orders = await prisma.order.findMany({
+                where: {
+                    address,
                 },
-            }
-        );
-        if (orderResponse.body.status === "ok") {
-            //successful order
-            //save to the db
-            let newOrder = await prisma.order.create({
-                data: {
-                    address: receiverAddress,
-                    pid: orderResponse.body.charge.id,
-                },
+                select: safeOrderFields,
             });
-            console.log({ newOrder });
 
-            //send response to client
             return res.status(200).json({
-                message: "Inscribe Order pending",
-                data: newOrder,
+                message: "Orders fetched successfully",
+                data: orders,
                 success: true,
             });
+        } catch (e) {
+            next(e);
         }
-        //an error occurred
-        throw buildOrdinalsBotError(orderResponse.body);
-
-        //success response
-        // let re = {
-        //     status: 'ok',
-        //     // ..., // input parameters
-        //     charge: {
-        //         "id": "815xxx-xxx-xxx-xxx79",
-        //         "address": "3P...Vu",
-        //         "amount": 1218725,
-        //         "lightning_invoice": {
-        //             "expires_at": 1675786558,
-        //             "payreq": "lnbc1218...7qz9v"
-        //         },
-        //         "created_at": 1677176476,
-        //     },
-        //     chainFee: 718725, // in satoshis
-        //     serviceFee: 100000, // in satoshis
-        //     orderType: 'bulk',
-        //     createdAt: 1675785959855, // timestamp in ms,
-        // }
-        // console.log({res, re});
-    } catch (e) {
-        next(e);
     }
-});
+);
+
+app.post(
+    "/inscribe",
+    async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            let { files, rarity, receiverAddress } = req.body;
+
+            validateOrderData({
+                files,
+                rarity,
+                receiverAddress,
+            });
+
+            // unique token for ordinals bot webhook
+            const orderToken = v4();
+            let data = {
+                files,
+                receiveAddress: receiverAddress,
+                fee: Number(process.env.MINING_FEE),
+                rareSats: rarity,
+                lowPostage: true,
+                // referral: process.env.REFERRAL_CODE
+                // additionalFee: proccess.env.REFERRAL_FEE
+                webhookUrl: `${process.env.BASE_URL}/inscribe/update-status/${orderToken}`,
+            };
+            let orderResponse = await needle(
+                "post",
+                `${process.env.ORDINALS_BOT_API_BASE_URL}/order`,
+                data,
+                {
+                    headers: {
+                        Accept: "application/json",
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+            const orderResponseData = orderResponse.body as
+                | OrdinalsBotCreateOrderResponse
+                | OrdinalsBotErrorResponse;
+            if (orderResponseData.status === "ok") {
+                console.log(orderResponseData);
+                //successful order
+                //save to the db
+                let newOrder = await prisma.order.create({
+                    data: {
+                        address: receiverAddress,
+                        pid: orderResponseData.id,
+                        update_token: orderToken,
+                    },
+                    select: safeOrderFields,
+                });
+                console.log({ newOrder });
+
+                //send response to client
+                return res.status(200).json({
+                    message: "Inscribe Order pending",
+                    data: newOrder,
+                    success: true,
+                });
+            }
+            //an error occurred
+            throw buildOrdinalsBotError(orderResponseData);
+        } catch (e) {
+            next(e);
+        }
+    }
+);
 
 //webhook which receives the inscribe order status
-app.post("/inscribe/update-status", async (req, res, next) => {
+app.post("/inscribe/update-status/:token", async (req, res, next) => {
     //once it gets here
-    let payload = req.body;
+    let payload = req.body as OrdinalsBotWebhookPayload;
+    const token = req.params.token;
     // {
     //     id: xxx, => orderId
     //     index: 0, => index of file in the original order request file array
@@ -209,34 +190,39 @@ app.post("/inscribe/update-status", async (req, res, next) => {
     //     tx: {reveal, inscription, commit} => inscription related transaction data
     // }
 
-    //update receiverwallet address
-    let data = {
-        orderId: payload.id,
-        address: "",
-    };
-    let response = await needle(
-        "post",
-        `${process.env.ORDINALS_BOT_API_BASE_URL}/address`,
-        data,
-        { json: true, headers: { Accept: "application/json" } }
-    );
-    if (response.body.status === "ok") {
-        //successfully done
-        //update user order
-        let update = await prisma.order.update({
-            where: {
-                pid: payload.id,
-            },
-            data: {
-                // pid: payload.id,
-                status: "INSCRIBED",
-            },
-        });
+    const existingOrder = await prisma.order.findFirst({
+        where: {
+            update_token: token,
+            pid: payload.id,
+        },
+        select: safeOrderFields,
+    });
 
-        //inscribe the html file with the payload.id
-    } else {
-        throw buildOrdinalsBotError(response.body);
+    if (!existingOrder) {
+        throw new ErrorResponse("Invalid order token", 401);
     }
+
+    if (existingOrder.status === Status.INSCRIBED) {
+        throw new ErrorResponse("Order already inscribed", 400);
+    }
+
+    let update = await prisma.order.update({
+        where: {
+            pid: payload.id,
+        },
+        data: {
+            status: "INSCRIBED",
+        },
+        select: safeOrderFields,
+    });
+
+    return res.status(200).json({
+        message: "Order updated successfully",
+        data: update,
+        success: true,
+    });
+
+    //inscribe the html file with the payload.id
 });
 
 //wayward route handler
@@ -251,7 +237,7 @@ app.use(function errorHandler(
     res: Response,
     next: NextFunction
 ) {
-    console.log({date: new Date(), error, req, res, next });
+    console.log({ date: new Date(), error, req, res, next });
     return res.status(error.statusCode).json({
         message: error.message,
         success: false,
