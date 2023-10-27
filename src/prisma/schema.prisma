@@ -19,7 +19,9 @@ model Order {
   id               Int      @id @default(autoincrement())
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
+  // order id from ordinalsbot
   pid              String?  @unique @db.VarChar(255)
+  // taproot address receiving the ordinal
   address          String
   transaction_data String?  @db.VarChar(2048)
   status           Status   @default(PENDING)

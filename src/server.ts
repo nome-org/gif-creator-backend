@@ -1,12 +1,13 @@
 import { config as loadEnvVars } from "dotenv";
 
 import express from "express";
-import { PrismaClient } from "@prisma/client";
+
 import needle from "needle";
 import ErrorResponse from "./lib/error-response";
 
+import prisma from "./lib/prisma-client";
+import { available_rarity } from "./constants/rarity";
 const app = express();
-const prisma = new PrismaClient();
 
 //load env
 loadEnvVars();
@@ -38,7 +39,7 @@ const buildOrdinalsBotError = (
               reason: string;
           }
 ) => {
-    throw new ErrorResponse(body.error || body.reason, 500);
+    return new ErrorResponse(body.error || body.reason, 500);
 };
 
 //prepare local server
@@ -70,7 +71,7 @@ app.get("/price", async (req, res, next) => {
                 success: true,
             });
         } else {
-            buildOrdinalsBotError(priceResponse.body);
+            throw buildOrdinalsBotError(priceResponse.body);
         }
     } catch (e) {
         next(e);
@@ -101,22 +102,37 @@ app.get("/:address/status", async (req, res, next) => {
 
 app.post("/inscribe", async (req, res, next) => {
     try {
-        let { files, qty, rarity, receiverAddress } = req.body;
+        let { files, rarity, receiverAddress } = req.body;
         //common values for rarity
-        let available_rarity = [
-            "2009",
-            "2010",
-            "2011",
-            "block78",
-            "pizza",
-            "uncommon",
-            "black",
-            "vintage",
-            "random",
-        ];
+
+        if (!files.length) {
+            throw new ErrorResponse("No files provided", 400);
+        }
+
+        if (!receiverAddress) {
+            throw new ErrorResponse("No receiver address provided", 400);
+        }
+
+        if (!available_rarity.includes(rarity)) {
+            throw new ErrorResponse("Invalid rarity provided", 400);
+        }
+        // check if files are valid format
+        const areFilesValid = files.every((file: any) => {
+            return (
+                file.name &&
+                file.type &&
+                file.dataURL &&
+                file.size &&
+                file.size <= 5000000
+            );
+        });
+
+        if (!areFilesValid) {
+            throw new ErrorResponse("Invalid file format", 400);
+        }
 
         let data = {
-            files: [],
+            files,
             receiveAddress: receiverAddress,
             fee: process.env.MINING_FEE,
             rareSats: rarity,
@@ -131,7 +147,10 @@ app.post("/inscribe", async (req, res, next) => {
             data,
             {
                 json: true,
-                headers: { Accept: "application/json" },
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                },
             }
         );
         if (orderResponse.body.status === "ok") {
@@ -146,14 +165,14 @@ app.post("/inscribe", async (req, res, next) => {
             console.log({ newOrder });
 
             //send response to client
-            return res.status(201).json({
+            return res.status(200).json({
                 message: "Inscribe Order pending",
                 data: newOrder,
                 success: true,
             });
         }
         //an error occurred
-        buildOrdinalsBotError(orderResponse.body);
+        throw buildOrdinalsBotError(orderResponse.body);
 
         //success response
         // let re = {
@@ -217,29 +236,37 @@ app.post("/inscribe/update-status", async (req, res, next) => {
 
         //inscribe the html file with the payload.id
     } else {
-        buildOrdinalsBotError(response.body);
+        throw buildOrdinalsBotError(response.body);
     }
 });
 
 //wayward route handler
-app.use("*", (req, res, next) => {
-    let e = new ErrorResponse("Page not found.\n Invalid API Route", 404);
-    next(e);
+app.use("*", (_req, _res, next) => {
+    next(new ErrorResponse("Page not found.\n Invalid API Route", 404));
 });
 
 //general error handler
-app.use(
-    (error: ErrorResponse, _req: express.Request, res: express.Response) => {
-        return res.status(error.statusCode).json({
-            message: error.message,
-            success: false,
-        });
-    }
-);
-const PORT = Number(process.env.PORT || 3000);
-app.listen(PORT, async () => {
-    console.log(`Server has started on http://localhost:${PORT}`);
-}).on("error", async (err) => {
-    console.log({ err });
-    console.log("FROM ERROR APP EVENT EMITTER");
+app.use(function errorHandler(
+    error: ErrorResponse,
+    _req: express.Request,
+    res: express.Response,
+    next: unknown
+) {
+    console.log({ error, _req, res, next });
+    return res.status(error.statusCode).json({
+        message: error.message,
+        success: false,
+    });
 });
+
+if (process.env.NODE_ENV !== "test") {
+    const PORT = Number(process.env.PORT || 3000);
+    app.listen(PORT, async () => {
+        console.log(`Server has started on http://localhost:${PORT}`);
+    }).on("error", async (err) => {
+        console.log({ err });
+        console.log("FROM ERROR APP EVENT EMITTER");
+    });
+}
+
+export { app };
