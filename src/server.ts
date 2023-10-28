@@ -4,7 +4,7 @@ import express from "express";
 import type { Request, Response, NextFunction } from "express";
 
 import needle from "needle";
-import ErrorResponse from "./lib/error-response";
+import ErrorResponse, { buildOrdinalsBotError } from "./lib/error-response";
 
 import prisma from "./lib/prisma-client";
 import { v4 } from "uuid";
@@ -36,10 +36,6 @@ app.use((_, res, next) => {
     res.setHeader("Access-Control-Allow-Max-Age", 24 * 60 * 60);
     next();
 });
-
-const buildOrdinalsBotError = (body: OrdinalsBotErrorResponse) => {
-    return new ErrorResponse(body.error || body.reason, 500);
-};
 
 //prepare local server
 

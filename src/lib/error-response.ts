@@ -1,3 +1,5 @@
+import { OrdinalsBotErrorResponse } from "../types/ordinals-bot";
+
 export default class ErrorResponse extends Error {
     constructor(
         public readonly message: string,
@@ -6,3 +8,7 @@ export default class ErrorResponse extends Error {
         super(message);
     }
 }
+
+export const buildOrdinalsBotError = (body: OrdinalsBotErrorResponse) => {
+    return new ErrorResponse(body.error || body.reason, 500);
+};
