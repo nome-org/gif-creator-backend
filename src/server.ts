@@ -7,7 +7,6 @@ import needle from "needle";
 import ErrorResponse from "./lib/error-response";
 
 import prisma from "./lib/prisma-client";
-import { available_rarity } from "./constants/rarity";
 import { v4 } from "uuid";
 import { FileData, validateOrderData } from "./lib/validation/orders";
 
@@ -16,8 +15,8 @@ import {
     OrdinalsBotErrorResponse,
     OrdinalsBotWebhookPayload,
 } from "./types/ordinals-bot";
-import { TransactionStatus } from "@prisma/client";
 import { hashFile } from "./lib/hashfile";
+import { toadScheduler } from "./scheduler/toad";
 const app = express();
 
 //load env
@@ -294,10 +293,14 @@ if (process.env.NODE_ENV !== "test") {
     const PORT = Number(process.env.PORT || 3000);
     app.listen(PORT, async () => {
         console.log(`Server has started on http://localhost:${PORT}`);
-    }).on("error", async (err) => {
-        console.log({ err });
-        console.log("FROM ERROR APP EVENT EMITTER");
-    });
+    })
+        .on("error", async (err) => {
+            console.log({ err });
+            console.log("FROM ERROR APP EVENT EMITTER");
+        })
+        .on("close", async () => {
+            toadScheduler.stop();
+        });
 }
 
 export { app };
