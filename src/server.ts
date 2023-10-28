@@ -52,23 +52,28 @@ const buildOrdinalsBotError = (body: OrdinalsBotErrorResponse) => {
 
 app.get("/price", async (req: Request, res: Response, next: NextFunction) => {
     try {
-        let { size, fee, count, rareSats } = req.query;
+        let { size, fee, count, rareSats } = req.query as {
+            size: string;
+            fee: string;
+            count?: string;
+            rareSats?: string;
+        };
+        const searchParams = new URLSearchParams({
+            size,
+            fee,
+            count: count || "1",
+            rareSats: rareSats || "random",
+        });
+
         let priceResponse = await needle(
             "get",
-            `${process.env.ORDINALS_BOT_API_BASE_URL}/price?size=${size}&fee=${fee}&count=${count}`,
+            `${process.env.ORDINALS_BOT_API_BASE_URL}/price?${searchParams}`,
             { json: true, headers: { Accept: "application/json" } }
         );
 
-        //possible response
-        // {
-        //     "status": "ok",
-        //     "chainFee": 9458, // chain fee that will be paid to miners
-        //     "baseFee": 100000, // base service fee taken by ordinalsbot.com
-        //     "serviceFee": 100945, // total service fee taken by ordinalsbot.com
-        //     "totalFee": 110403 // total amount to be paid by the user
-        // }
-        if (priceResponse.body.status === "ok") {
-            let fee = priceResponse.body.totalFee;
+        if (priceResponse.body.status !== "error") {
+            let fee =
+                priceResponse.body.totalFee + Number(process.env.REFERRAL_FEE);
             return res.status(200).json({
                 message: "Price calculated",
                 data: {
