@@ -17,18 +17,11 @@ import {
 } from "./types/ordinals-bot";
 import { hashFile } from "./lib/hashfile";
 import { toadScheduler } from "./scheduler/toad";
+import { TransactionStatus } from "@prisma/client";
 const app = express();
 
 //load env
 loadEnvVars();
-
-const safeOrderFields = {
-    receiver_address: true,
-    created_at: true,
-    ordinals_bot_order_id: true,
-    id: true,
-    updated_at: true,
-};
 
 app.use(express.json());
 //cors
@@ -101,12 +94,27 @@ app.get(
                 where: {
                     receiver_address: address,
                 },
-                select: safeOrderFields,
+                select: {
+                    receiver_address: true,
+                    created_at: true,
+                    ordinals_bot_order_id: true,
+                    id: true,
+                    updated_at: true,
+                    html_transaction_id: true,
+                    html_transaction: true,
+                    html_inscription_index: true,
+                },
             });
 
             return res.status(200).json({
                 message: "Orders fetched successfully",
-                data: orders,
+                data: orders.map((order) => ({
+                    ...order,
+                    status:
+                        order.html_transaction?.status ||
+                        TransactionStatus.PENDING,
+                    html_transaction: null,
+                })),
                 success: true,
             });
         } catch (e) {
@@ -170,7 +178,9 @@ app.post(
                         ordinals_bot_order_id: orderResponseData.id,
                         update_token: orderToken,
                     },
-                    select: safeOrderFields,
+                    select: {
+                        id: true,
+                    },
                 });
 
                 for (let file of orderResponseData.files) {
@@ -186,7 +196,6 @@ app.post(
                         },
                     });
                 }
-                console.log({ newOrder });
 
                 //send response to client
                 return res.status(200).json({
@@ -214,12 +223,10 @@ app.post("/inscribe/update-status/:token", async (req, res, next) => {
         //once it gets here
         let payload = req.body as OrdinalsBotWebhookPayload;
         const token = req.params.token;
-        // {
-        //     id: xxx, => orderId
-        //     index: 0, => index of file in the original order request file array
-        //     file: {...} => file object for the update
-        //     tx: {reveal, inscription, commit} => inscription related transaction data
-        // }
+
+        if (!token) {
+            throw new ErrorResponse("Invalid order token", 401);
+        }
 
         const where = {
             name: payload.file.name,
