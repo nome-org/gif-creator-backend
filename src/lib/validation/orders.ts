@@ -1,7 +1,7 @@
 import { available_rarity } from "../../constants/rarity";
 import ErrorResponse from "../error-response";
 
-type FileData = {
+export type FileData = {
     name: string;
     type: string;
     dataURL: string;

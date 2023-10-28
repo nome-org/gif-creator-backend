@@ -5,8 +5,8 @@
     "main": "index.js",
     "scripts": {
         "dev": "npm run db:generate && nodemon -q -e ts src/server.ts",
-        "db:generate": "prisma generate --schema=./src/prisma/schema.prisma",
-        "db:push": "prisma db push --schema=./src/prisma/schema.prisma",
+        "db:generate": "prisma generate",
+        "db:push": "prisma db push",
         "start": "npm run db:generate && ts-node src/server.ts",
         "test": "cross-env NODE_ENV=test jest --testTimeout=10000",
         "pretest": "cross-env NODE_ENV=test npm run migrate:reset"
@@ -47,5 +47,8 @@
         "testMatch": [
             "**/tests/**/*.test.ts"
         ]
+    },
+    "prisma": {
+        "schema": "./src/prisma/schema.prisma"
     }
 }

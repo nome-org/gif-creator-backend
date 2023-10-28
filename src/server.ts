@@ -9,25 +9,25 @@ import ErrorResponse from "./lib/error-response";
 import prisma from "./lib/prisma-client";
 import { available_rarity } from "./constants/rarity";
 import { v4 } from "uuid";
-import { validateOrderData } from "./lib/validation/orders";
-import { Status } from "@prisma/client";
+import { FileData, validateOrderData } from "./lib/validation/orders";
+
 import {
     OrdinalsBotCreateOrderResponse,
     OrdinalsBotErrorResponse,
     OrdinalsBotWebhookPayload,
 } from "./types/ordinals-bot";
+import { TransactionStatus } from "@prisma/client";
+import { hashFile } from "./lib/hashfile";
 const app = express();
 
 //load env
 loadEnvVars();
 
 const safeOrderFields = {
-    address: true,
+    receiver_address: true,
     created_at: true,
-    pid: true,
-    status: true,
+    ordinals_bot_order_id: true,
     id: true,
-    transaction_data: true,
     updated_at: true,
 };
 
@@ -95,7 +95,7 @@ app.get(
             //then check if the user has an order already and send back those details
             let orders = await prisma.order.findMany({
                 where: {
-                    address,
+                    receiver_address: address,
                 },
                 select: safeOrderFields,
             });
@@ -115,24 +115,31 @@ app.post(
     "/inscribe",
     async (req: Request, res: Response, next: NextFunction) => {
         try {
-            let { files, rarity, receiverAddress } = req.body;
+            let { files, rarity, receiverAddress } = req.body as {
+                files: FileData[];
+                rarity: string;
+                receiverAddress: string;
+            };
 
             validateOrderData({
                 files,
                 rarity,
                 receiverAddress,
             });
-
+            const namedFiles = files.map((file) => ({
+                ...file,
+                name: `${v4()}.${file.name.split(".").pop()}`,
+            }));
             // unique token for ordinals bot webhook
             const orderToken = v4();
             let data = {
-                files,
+                files: namedFiles,
                 receiveAddress: receiverAddress,
                 fee: Number(process.env.MINING_FEE),
                 rareSats: rarity,
                 lowPostage: true,
-                // referral: process.env.REFERRAL_CODE
-                // additionalFee: proccess.env.REFERRAL_FEE
+                referral: process.env.REFERRAL_CODE,
+                additionalFee: Number(process.env.REFERRAL_FEE),
                 webhookUrl: `${process.env.BASE_URL}/inscribe/update-status/${orderToken}`,
             };
             let orderResponse = await needle(
@@ -155,18 +162,37 @@ app.post(
                 //save to the db
                 let newOrder = await prisma.order.create({
                     data: {
-                        address: receiverAddress,
-                        pid: orderResponseData.id,
+                        receiver_address: receiverAddress,
+                        ordinals_bot_order_id: orderResponseData.id,
                         update_token: orderToken,
                     },
                     select: safeOrderFields,
                 });
+
+                for (let file of orderResponseData.files) {
+                    const fileData = namedFiles.find((item) =>
+                        file.name.includes(item.name)
+                    )!;
+                    await prisma.orderFile.create({
+                        data: {
+                            order_id: newOrder.id,
+                            name: file.name,
+                            size: file.size,
+                            hash: await hashFile(fileData.dataURL),
+                        },
+                    });
+                }
                 console.log({ newOrder });
 
                 //send response to client
                 return res.status(200).json({
                     message: "Inscribe Order pending",
-                    data: newOrder,
+                    data: {
+                        ...newOrder,
+                        payment_details: {
+                            ...orderResponseData.charge,
+                        },
+                    },
                     success: true,
                 });
             }
@@ -178,7 +204,7 @@ app.post(
     }
 );
 
-//webhook which receives the inscribe order status
+//webhook which receives the file inscription status
 app.post("/inscribe/update-status/:token", async (req, res, next) => {
     try {
         //once it gets here
@@ -191,30 +217,46 @@ app.post("/inscribe/update-status/:token", async (req, res, next) => {
         //     tx: {reveal, inscription, commit} => inscription related transaction data
         // }
 
-        const existingOrder = await prisma.order.findFirst({
-            where: {
+        const where = {
+            name: payload.file.name,
+            order: {
                 update_token: token,
-                pid: payload.id,
+                ordinals_bot_order_id: payload.id,
             },
-            select: safeOrderFields,
+        };
+
+        const existingFile = await prisma.orderFile.findFirst({
+            where,
+            include: {
+                order: true,
+            },
         });
 
-        if (!existingOrder) {
+        if (!existingFile) {
             throw new ErrorResponse("Invalid order token", 401);
         }
 
-        if (existingOrder.status === Status.INSCRIBED) {
+        if (existingFile.transaction_id) {
             throw new ErrorResponse("Order already inscribed", 400);
         }
 
-        let update = await prisma.order.update({
+        const fileTransaction = await prisma.transaction.create({
+            data: {
+                tx_id: payload.tx.reveal,
+            },
+        });
+
+        const inscription_index = Number(
+            payload.tx.inscription.split("i").pop()
+        );
+        let update = await prisma.orderFile.update({
             where: {
-                pid: payload.id,
+                id: existingFile.id,
             },
             data: {
-                status: "INSCRIBED",
+                transaction_id: fileTransaction.id,
+                inscription_index,
             },
-            select: safeOrderFields,
         });
 
         return res.status(200).json({

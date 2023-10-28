@@ -10,22 +10,57 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Status {
-  INSCRIBED
+enum TransactionStatus {
+  // PENDING_PAYMENT would be when the transaction id is null
   PENDING
+  CONFIRMED
 }
 
 model Order {
-  id               Int      @id @default(autoincrement())
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+  id                     Int          @id @default(autoincrement())
+  created_at             DateTime     @default(now())
+  updated_at             DateTime     @updatedAt
   // order id from ordinalsbot
-  pid              String?  @unique @db.VarChar(255)
+  ordinals_bot_order_id  String?      @unique @db.VarChar(255)
   // taproot address receiving the ordinal
-  address          String
-  transaction_data String?  @db.VarChar(2048)
-  update_token     String   @unique @db.VarChar(255)
-  status           Status   @default(PENDING)
+  receiver_address       String
+  update_token           String       @unique @db.VarChar(255)
+  files                  OrderFile[]
+  // this is null at first since it requires all children to be confirmed
+  html_transaction       Transaction? @relation(fields: [html_transaction_id], references: [id])
+  html_transaction_id    Int?         @unique
+  // e.g. 0
+  html_inscription_index Int?
 
   @@map("orders")
+}
+
+model OrderFile {
+  id                Int          @id @default(autoincrement())
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+  name              String       @db.VarChar(255)
+  hash              String       @db.VarChar(255)
+  size              Int
+  order_id          Int
+  order             Order        @relation(fields: [order_id], references: [id])
+  transaction_id    Int?         @unique
+  tx                Transaction? @relation(fields: [transaction_id], references: [id])
+  // e.g. 0
+  inscription_index Int?
+
+  @@map("order_files")
+}
+
+model Transaction {
+  id         Int               @id @default(autoincrement())
+  created_at DateTime          @default(now())
+  updated_at DateTime          @updatedAt
+  // e.g. afeeb0c842249366834d84c82f541a0b8ce3d70be645034ee087165596af3df8
+  tx_id      String            @unique @db.VarChar(255)
+  status     TransactionStatus @default(PENDING)
+  orderFile  OrderFile?
+  order      Order?
+
+  @@map("transactions")
 }

@@ -21,7 +21,7 @@ export interface OrdinalsBotCreateOrderResponse {
     baseFee: number;
     rareSatsFee: number;
     postage: number;
-    referral?: any;
+    referral?: string;
     rareSats: string;
     receiveAddress: string;
     webhookUrl: string;
@@ -42,15 +42,15 @@ interface Charge {
     created_at: number;
     status: string;
     amount: number;
-    callback_url?: any;
-    success_url?: any;
+    callback_url?: string;
+    success_url?: string;
     hosted_checkout_url: string;
-    order_id?: any;
+    order_id?: string;
     currency: string;
     source_fiat_value: number;
     fiat_value: number;
     auto_settle: boolean;
-    notif_email?: any;
+    notif_email?: string;
     address: string;
     chain_invoice: Chaininvoice;
     uri: string;
@@ -78,18 +78,19 @@ interface File {
 export interface OrdinalsBotWebhookPayload {
     id: string;
     index: number;
-    file: File & {
-        iqueued: boolean;
-        iqueuedAt: number;
-    };
+    file: WebhookFile;
     tx: Tx;
 }
 
+interface WebhookFile extends File {
+    iqueued: boolean;
+    iqueuedAt: number;
+}
 interface Tx {
-    satpoint: string;
     commit: string;
     fees: number;
-    reveal: string;
     inscription: string;
+    reveal: string;
+    satpoint: string;
     updatedAt: string;
 }
