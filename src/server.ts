@@ -125,7 +125,6 @@ app.get(
                     status:
                         order.html_transaction?.status ||
                         TransactionStatus.PENDING,
-                    html_transaction: null,
                 })),
                 success: true,
             });
