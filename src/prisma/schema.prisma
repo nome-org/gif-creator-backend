@@ -32,7 +32,7 @@ model Order {
   // order id from ordinalsbot
   ordinals_bot_order_id String?     @unique @db.VarChar(255)
   // taproot address receiving the ordinal
-  receiver_address      String
+  receiver_address      String      @db.VarChar(255)
   update_token          String      @unique @db.VarChar(255)
   status                OrderStatus @default(UNPAID)
   payment_tx_id         String?     @unique @db.VarChar(255)
