@@ -1,4 +1,4 @@
-export const available_rarity: Array<String> = [
+export const available_rarity = [
     "2009",
     "2010",
     "2011",

@@ -1,19 +1,20 @@
 import { app } from "../../src/server";
 import supertest from "supertest";
+import { prismaMock } from "../prisma-singleton";
 
-import { mock } from "jest-mock-extended";
-import needle, { NeedleResponse } from "needle";
 const requestWithSupertest = supertest(app);
 
 jest.mock("needle", () =>
-    jest.fn(() => {
+    jest.fn((method, url, body, opts) => {
         return {
             status: 200,
             body: {
                 status: "ok",
+                id: "463e6582-d58c-4040-be7c-e5faa72cfa24",
                 charge: {
                     id: "123456789",
                 },
+                files: body.files,
             },
         };
     })
@@ -21,16 +22,25 @@ jest.mock("needle", () =>
 
 describe("Orders Endpoints", () => {
     it("POST /inscribe should create an order", async () => {
+        prismaMock.order.create.mockResolvedValueOnce({
+            id: 1,
+            created_at: new Date(),
+            updated_at: new Date(),
+            html_inscription_index: 1,
+            html_transaction_id: 1,
+            ordinals_bot_order_id: "2143",
+            receiver_address: "afadf",
+            update_token: "4124",
+        });
         const res = await requestWithSupertest.post("/inscribe").send({
             files: [
                 {
-                    name: "test",
-                    type: "image/png",
-                    dataURL: "data:image/png;base64,123456789",
+                    name: "test.webp",
+                    type: "image/webp",
+                    dataURL: "data:image/webp;base64,123456789",
                     size: 10,
                 },
             ],
-            qty: 1,
             rarity: "2009",
             receiverAddress: "0x123456789",
         });
@@ -44,7 +54,7 @@ describe("Orders Endpoints", () => {
     it("POST /inscribe should return 400 if no files are provided", async () => {
         const res = await requestWithSupertest.post("/inscribe").send({
             files: [],
-            qty: 1,
+
             rarity: "2009",
             receiverAddress: "0x123456789",
         });
@@ -63,7 +73,7 @@ describe("Orders Endpoints", () => {
                     size: 10,
                 },
             ],
-            qty: 1,
+
             rarity: "2009",
             receiverAddress: "",
         });

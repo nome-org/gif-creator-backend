@@ -18,6 +18,7 @@ import {
 import { hashFile } from "./lib/hashfile";
 import { toadScheduler } from "./scheduler/toad";
 import { TransactionStatus } from "@prisma/client";
+import { available_rarity } from "./constants/rarity";
 const app = express();
 
 //load env
@@ -47,6 +48,21 @@ app.get("/price", async (req: Request, res: Response, next: NextFunction) => {
             count?: string;
             rareSats?: string;
         };
+        if (!size || !fee) {
+            throw new ErrorResponse("Invalid query params", 400);
+        }
+        if (isNaN(Number(size)) || isNaN(Number(fee))) {
+            throw new ErrorResponse("Invalid query params", 400);
+        }
+        if (Number(size) < 1 || Number(fee) < 1) {
+            throw new ErrorResponse("Invalid query params", 400);
+        }
+        if (count && isNaN(Number(count))) {
+            throw new ErrorResponse("Invalid query params", 400);
+        }
+        if (rareSats && !available_rarity.includes(rareSats)) {
+            throw new ErrorResponse("Invalid query params", 400);
+        }
         const searchParams = new URLSearchParams({
             size,
             fee,
@@ -165,7 +181,6 @@ app.post(
                 | OrdinalsBotCreateOrderResponse
                 | OrdinalsBotErrorResponse;
             if (orderResponseData.status === "ok") {
-                console.log(orderResponseData);
                 //successful order
                 //save to the db
                 let newOrder = await prisma.order.create({
@@ -290,7 +305,9 @@ app.use(function errorHandler(
     res: Response,
     next: NextFunction
 ) {
-    console.log({ date: new Date(), error });
+    if (process.env.NODE_ENV !== "test") {
+        console.log({ date: new Date(), error });
+    }
     return res.status(error.statusCode).json({
         message: error.message,
         success: false,
