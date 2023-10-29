@@ -1,6 +1,7 @@
 import { app } from "../../src/server";
 import supertest from "supertest";
 import { prismaMock } from "../prisma-singleton";
+import { hashFile } from "../../src/lib/hashfile";
 
 const requestWithSupertest = supertest(app);
 
@@ -44,7 +45,7 @@ describe("Orders Endpoints", () => {
             rarity: "2009",
             receiverAddress: "0x123456789",
         });
-
+        expect(prismaMock.orderFile.create).toBeCalledTimes(1);
         expect(res.status).toEqual(200);
         expect(res.type).toEqual(expect.stringContaining("json"));
         expect(res.body).toHaveProperty("success");
@@ -54,10 +55,10 @@ describe("Orders Endpoints", () => {
     it("POST /inscribe should return 400 if no files are provided", async () => {
         const res = await requestWithSupertest.post("/inscribe").send({
             files: [],
-
             rarity: "2009",
             receiverAddress: "0x123456789",
         });
+        expect(prismaMock.order.create).toBeCalledTimes(0);
         expect(res.status).toEqual(400);
         expect(res.type).toEqual(expect.stringContaining("json"));
         expect(res.body).toHaveProperty("message");
