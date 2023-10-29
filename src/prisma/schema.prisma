@@ -16,9 +16,13 @@ enum TransactionStatus {
 }
 
 enum OrderStatus {
-  PENDING_PAYMENT
-  PENDING_CONFIRMATION
-  CONFIRMED
+  UNPAID
+  PAYMENT_PENDING
+  PAYMENT_CONFIRMED
+  IMAGE_ORDINALS_PENDING
+  IMAGE_ORDINALS_CONFIRMED
+  HTML_ORDINALS_PENDING
+  READY
 }
 
 model Order {
@@ -30,7 +34,8 @@ model Order {
   // taproot address receiving the ordinal
   receiver_address      String
   update_token          String      @unique @db.VarChar(255)
-  status                OrderStatus @default(PENDING_PAYMENT)
+  status                OrderStatus @default(UNPAID)
+  payment_tx_id         String?     @unique @db.VarChar(255)
   image_ordinals        Ordinal[]   @relation(name: "image_files")
   html_ordinals         Ordinal[]   @relation(name: "html_files")
   quantity              Int
