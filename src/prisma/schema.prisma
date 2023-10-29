@@ -11,56 +11,46 @@ datasource db {
 }
 
 enum TransactionStatus {
-  // PENDING_PAYMENT would be when the transaction id is null
   PENDING
   CONFIRMED
 }
 
+enum OrderStatus {
+  PENDING_PAYMENT
+  PENDING_CONFIRMATION
+  CONFIRMED
+}
+
 model Order {
-  id                     Int          @id @default(autoincrement())
-  created_at             DateTime     @default(now())
-  updated_at             DateTime     @updatedAt
+  id                    Int         @id @default(autoincrement())
+  created_at            DateTime    @default(now())
+  updated_at            DateTime    @updatedAt
   // order id from ordinalsbot
-  ordinals_bot_order_id  String?      @unique @db.VarChar(255)
+  ordinals_bot_order_id String?     @unique @db.VarChar(255)
   // taproot address receiving the ordinal
-  receiver_address       String
-  update_token           String       @unique @db.VarChar(255)
-  files                  OrderFile[]
-  // this is null at first since it requires all children to be confirmed
-  html_transaction       Transaction? @relation(fields: [html_transaction_id], references: [id])
-  html_transaction_id    Int?         @unique
+  receiver_address      String
+  update_token          String      @unique @db.VarChar(255)
+  status                OrderStatus @default(PENDING_PAYMENT)
+  image_ordinals        Ordinal[]   @relation(name: "image_files")
+  html_ordinals         Ordinal[]   @relation(name: "html_files")
+  quantity              Int
   // e.g. 0
-  html_inscription_index Int?
-
-  @@map("orders")
 }
 
-model OrderFile {
-  id                Int          @id @default(autoincrement())
-  created_at        DateTime     @default(now())
-  updated_at        DateTime     @updatedAt
-  name              String       @db.VarChar(255)
-  hash              String       @db.VarChar(255)
-  size              Int
-  order_id          Int
-  order             Order        @relation(fields: [order_id], references: [id])
-  transaction_id    Int?         @unique
-  tx                Transaction? @relation(fields: [transaction_id], references: [id])
-  // e.g. 0
-  inscription_index Int?
-
-  @@map("order_files")
-}
-
-model Transaction {
-  id         Int               @id @default(autoincrement())
-  created_at DateTime          @default(now())
-  updated_at DateTime          @updatedAt
-  // e.g. afeeb0c842249366834d84c82f541a0b8ce3d70be645034ee087165596af3df8
-  tx_id      String            @unique @db.VarChar(255)
-  status     TransactionStatus @default(PENDING)
-  orderFile  OrderFile?
-  order      Order?
-
-  @@map("transactions")
+model Ordinal {
+  id                   Int               @id @default(autoincrement())
+  created_at           DateTime          @default(now())
+  updated_at           DateTime          @updatedAt
+  name                 String            @db.VarChar(255)
+  hash                 String            @db.VarChar(255)
+  type                 String            @db.VarChar(255)
+  size                 Int
+  duration             Int
+  tx_id                String?           @unique @db.VarChar(255)
+  tx_status            TransactionStatus @default(PENDING)
+  ordinal_index        Int?
+  image_files_order_id Int?
+  image_files_order    Order?            @relation(name: "image_files", fields: [image_files_order_id], references: [id])
+  html_files_order_id  Int?
+  html_files_order     Order?            @relation(name: "html_files", fields: [html_files_order_id], references: [id])
 }

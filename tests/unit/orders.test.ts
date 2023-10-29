@@ -2,6 +2,7 @@ import { app } from "../../src/server";
 import supertest from "supertest";
 import { prismaMock } from "../prisma-singleton";
 import { hashFile } from "../../src/lib/hashfile";
+import { OrderStatus } from "@prisma/client";
 
 const requestWithSupertest = supertest(app);
 
@@ -27,11 +28,11 @@ describe("Orders Endpoints", () => {
             id: 1,
             created_at: new Date(),
             updated_at: new Date(),
-            html_inscription_index: 1,
-            html_transaction_id: 1,
             ordinals_bot_order_id: "2143",
             receiver_address: "afadf",
             update_token: "4124",
+            quantity: 1,
+            status: OrderStatus.PENDING_PAYMENT,
         });
         const res = await requestWithSupertest.post("/inscribe").send({
             files: [
@@ -45,7 +46,7 @@ describe("Orders Endpoints", () => {
             rarity: "2009",
             receiverAddress: "0x123456789",
         });
-        expect(prismaMock.orderFile.create).toBeCalledTimes(1);
+        expect(prismaMock.ordinal.create).toBeCalledTimes(1);
         expect(res.status).toEqual(200);
         expect(res.type).toEqual(expect.stringContaining("json"));
         expect(res.body).toHaveProperty("success");

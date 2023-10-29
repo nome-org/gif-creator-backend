@@ -6,6 +6,7 @@ export type FileData = {
     type: string;
     dataURL: string;
     size: number;
+    duration: number;
 };
 
 const allowedFileTypes = ["image/webp", "plain/text"];
@@ -23,10 +24,12 @@ export const validateOrderData = ({
     files,
     receiverAddress,
     rarity,
+    quantity,
 }: {
     files: FileData[];
     receiverAddress: string;
     rarity: string;
+    quantity?: number;
 }) => {
     if (!files.length) {
         throw new ErrorResponse("No files provided", 400);
@@ -38,6 +41,10 @@ export const validateOrderData = ({
 
     if (!available_rarity.includes(rarity)) {
         throw new ErrorResponse("Invalid rarity provided", 400);
+    }
+
+    if (quantity && quantity < 1) {
+        throw new ErrorResponse("Invalid quantity provided", 400);
     }
     // check if files are valid format
     const areFilesValid = files.every(validateFile);

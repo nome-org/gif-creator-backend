@@ -4,13 +4,6 @@ const requestWithSupertest = supertest(app);
 
 describe("GET /price", () => {
     it("should return 200 with calculated price when given valid query params", async () => {
-        const priceResponse = {
-            body: {
-                status: "ok",
-                totalFee: 0.0001,
-            },
-        };
-
         const res = await requestWithSupertest.get("/price?size=1&fee=1");
 
         expect(res.statusCode).toBe(200);

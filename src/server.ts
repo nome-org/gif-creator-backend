@@ -112,20 +112,14 @@ app.get(
                     ordinals_bot_order_id: true,
                     id: true,
                     updated_at: true,
-                    html_transaction_id: true,
-                    html_transaction: true,
-                    html_inscription_index: true,
+                    status: true,
+                    quantity: true,
                 },
             });
 
             return res.status(200).json({
                 message: "Orders fetched successfully",
-                data: orders.map((order) => ({
-                    ...order,
-                    status:
-                        order.html_transaction?.status ||
-                        TransactionStatus.PENDING,
-                })),
+                data: orders,
                 success: true,
             });
         } catch (e) {
@@ -138,16 +132,18 @@ app.post(
     "/inscribe",
     async (req: Request, res: Response, next: NextFunction) => {
         try {
-            let { files, rarity, receiverAddress } = req.body as {
+            let { files, rarity, receiverAddress, quantity } = req.body as {
                 files: FileData[];
                 rarity: string;
                 receiverAddress: string;
+                quantity?: number;
             };
 
             validateOrderData({
                 files,
                 rarity,
                 receiverAddress,
+                quantity,
             });
             const namedFiles = files.map((file) => ({
                 ...file,
@@ -187,6 +183,7 @@ app.post(
                         receiver_address: receiverAddress,
                         ordinals_bot_order_id: orderResponseData.id,
                         update_token: orderToken,
+                        quantity: quantity || 1,
                     },
                     select: {
                         id: true,
@@ -197,12 +194,14 @@ app.post(
                     const fileData = namedFiles.find((item) =>
                         file.name.includes(item.name)
                     )!;
-                    await prisma.orderFile.create({
+                    await prisma.ordinal.create({
                         data: {
-                            order_id: newOrder.id,
+                            image_files_order_id: newOrder.id,
                             name: file.name,
                             size: file.size,
                             hash: await hashFile(fileData.dataURL),
+                            duration: fileData.duration,
+                            type: file.type,
                         },
                     });
                 }
@@ -246,10 +245,11 @@ app.post("/inscribe/update-status/:token", async (req, res, next) => {
             },
         };
 
-        const existingFile = await prisma.orderFile.findFirst({
+        const existingFile = await prisma.ordinal.findFirst({
             where,
             include: {
-                order: true,
+                html_files_order: true,
+                image_files_order: true,
             },
         });
 
@@ -257,26 +257,18 @@ app.post("/inscribe/update-status/:token", async (req, res, next) => {
             throw new ErrorResponse("Invalid order token", 401);
         }
 
-        if (existingFile.transaction_id) {
+        if (existingFile.tx_id) {
             throw new ErrorResponse("Order already inscribed", 400);
         }
 
-        const fileTransaction = await prisma.transaction.create({
-            data: {
-                tx_id: payload.tx.reveal,
-            },
-        });
-
-        const inscription_index = Number(
-            payload.tx.inscription.split("i").pop()
-        );
-        let update = await prisma.orderFile.update({
+        const [tx_id, ordinal_index] = payload.tx.inscription.split("i");
+        const update = await prisma.ordinal.update({
             where: {
                 id: existingFile.id,
             },
             data: {
-                transaction_id: fileTransaction.id,
-                inscription_index,
+                tx_id,
+                ordinal_index: Number(ordinal_index),
             },
         });
 
