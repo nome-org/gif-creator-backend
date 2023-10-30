@@ -64,6 +64,9 @@ export const buildGifHTMLMini = (title: string, files: Ordinal[]) => {
         .join(
             ","
         )}];let o=0;for(;;){const s=t.item(o),i=t.item((o||t.length)-1);await e(n[o]||1e3),i.style.setProperty("display","none"),s.style.setProperty("display","block"),o===t.length-1?o=0:o+=1}})</script><body style=margin:0;isolation:isolate><div class=grid-container>${files
-        .map((file) => `<img class=grid-item src=/content/${file.tx_id}i0>`)
+        .map(
+            (file) =>
+                `<img class=grid-item src=/content/${file.tx_id}i${file.ordinal_index}>`
+        )
         .join("\n")}</div>    </body></html>`;
 };

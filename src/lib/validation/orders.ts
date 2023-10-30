@@ -25,14 +25,20 @@ export const validateOrderData = ({
     receiverAddress,
     rarity,
     quantity,
+    payAddress,
 }: {
     files: FileData[];
     receiverAddress: string;
     rarity: string;
     quantity?: number;
+    payAddress: string;
 }) => {
     if (!files.length) {
         throw new ErrorResponse("No files provided", 400);
+    }
+
+    if (!payAddress) {
+        throw new ErrorResponse("No pay address provided", 400);
     }
 
     if (!receiverAddress) {

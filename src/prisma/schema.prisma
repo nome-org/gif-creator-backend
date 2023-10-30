@@ -16,11 +16,15 @@ enum TransactionStatus {
 }
 
 enum OrderStatus {
+  // first order is created pending payment
   UNPAID
+  // then the user pays the payment tx can be seen on the blockchain
   PAYMENT_PENDING
   PAYMENT_CONFIRMED
+  // then the ordinals bot creates the image ordinals
   IMAGE_ORDINALS_PENDING
   IMAGE_ORDINALS_CONFIRMED
+  // then the ordinals bot creates the html ordinals
   HTML_ORDINALS_PENDING
   READY
 }
@@ -32,30 +36,33 @@ model Order {
   // order id from ordinalsbot
   ordinals_bot_order_id String?     @unique @db.VarChar(255)
   // taproot address receiving the ordinal
+  total_fee             Int
+  fee_rate              Int
+  rarity                String      @db.VarChar(255)
   receiver_address      String      @db.VarChar(255)
-  update_token          String      @unique @db.VarChar(255)
+  update_token          String?     @unique @db.VarChar(255)
   status                OrderStatus @default(UNPAID)
   payment_tx_id         String?     @unique @db.VarChar(255)
   image_ordinals        Ordinal[]   @relation(name: "image_files")
   html_ordinals         Ordinal[]   @relation(name: "html_files")
   quantity              Int
-  // e.g. 0
 }
 
 model Ordinal {
-  id                   Int               @id @default(autoincrement())
-  created_at           DateTime          @default(now())
-  updated_at           DateTime          @updatedAt
-  name                 String            @db.VarChar(255)
-  hash                 String            @db.VarChar(255)
-  type                 String            @db.VarChar(255)
-  size                 Int
-  duration             Int
-  tx_id                String?           @unique @db.VarChar(255)
-  tx_status            TransactionStatus @default(PENDING)
-  ordinal_index        Int?
-  image_files_order_id Int?
-  image_files_order    Order?            @relation(name: "image_files", fields: [image_files_order_id], references: [id])
-  html_files_order_id  Int?
-  html_files_order     Order?            @relation(name: "html_files", fields: [html_files_order_id], references: [id])
+  id                    Int               @id @default(autoincrement())
+  created_at            DateTime          @default(now())
+  updated_at            DateTime          @updatedAt
+  name                  String            @db.VarChar(255)
+  hash                  String            @db.VarChar(255)
+  type                  String            @db.VarChar(255)
+  size                  Int
+  duration              Int
+  tx_id                 String?           @unique @db.VarChar(255)
+  tx_status             TransactionStatus @default(PENDING)
+  ordinals_bot_order_id String            @db.VarChar(255)
+  ordinal_index         Int?
+  image_files_order_id  Int?
+  image_files_order     Order?            @relation(name: "image_files", fields: [image_files_order_id], references: [id])
+  html_files_order_id   Int?
+  html_files_order      Order?            @relation(name: "html_files", fields: [html_files_order_id], references: [id])
 }

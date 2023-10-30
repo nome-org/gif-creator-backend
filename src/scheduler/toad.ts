@@ -1,8 +1,10 @@
 import { ToadScheduler } from "toad-scheduler";
 import { watchOrdinalTransactionsJob } from "./watch-ordinal-transactions";
-import { watchPaymentTransactionsJob } from "./watch-payment-transactions";
+
+import { watchOrderPaymentTransactionsJob } from "./watch-order-payment-transactions";
 
 export const toadScheduler = new ToadScheduler();
 
 toadScheduler.addSimpleIntervalJob(watchOrdinalTransactionsJob);
-toadScheduler.addSimpleIntervalJob(watchPaymentTransactionsJob);
+
+toadScheduler.addSimpleIntervalJob(watchOrderPaymentTransactionsJob);

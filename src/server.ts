@@ -3,22 +3,20 @@ import { config as loadEnvVars } from "dotenv";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 
-import needle from "needle";
-import ErrorResponse, { buildOrdinalsBotError } from "./lib/error-response";
+import ErrorResponse from "./lib/error-response";
 
 import prisma from "./lib/prisma-client";
-import { v4 } from "uuid";
 import { FileData, validateOrderData } from "./lib/validation/orders";
 
-import {
-    OrdinalsBotCreateOrderResponse,
-    OrdinalsBotErrorResponse,
-    OrdinalsBotWebhookPayload,
-} from "./types/ordinals-bot";
-import { hashFile } from "./lib/hashfile";
+import { OrdinalsBotWebhookPayload } from "./types/ordinals-bot";
+
 import { toadScheduler } from "./scheduler/toad";
-import { TransactionStatus } from "@prisma/client";
 import { available_rarity } from "./constants/rarity";
+import { calculatePrice } from "./lib/calculatePrice";
+import { getAddressByIndex, getKeyByIndex } from "./lib/payments/bitcoin";
+import { v4 } from "uuid";
+import { ordinalsBotInscribe } from "./lib/ordinals-bot/inscribe";
+import { hashFile } from "./lib/hashfile";
 const app = express();
 
 //load env
@@ -42,19 +40,29 @@ app.use((_, res, next) => {
 
 app.get("/price", async (req: Request, res: Response, next: NextFunction) => {
     try {
-        let { size, fee, count, rareSats } = req.query as {
-            size: string;
+        let {
+            imageSizes,
+            fee: fee_rate,
+            count,
+            rareSats,
+        } = req.query as {
+            imageSizes: string[];
             fee: string;
             count?: string;
             rareSats?: string;
         };
-        if (!size || !fee) {
+        if (!imageSizes.length || !fee_rate) {
             throw new ErrorResponse("Invalid query params", 400);
         }
-        if (isNaN(Number(size)) || isNaN(Number(fee))) {
+        if (
+            imageSizes.every(
+                (size) => isNaN(Number(size)) || Number(size) < 1
+            ) ||
+            isNaN(Number(fee_rate))
+        ) {
             throw new ErrorResponse("Invalid query params", 400);
         }
-        if (Number(size) < 1 || Number(fee) < 1) {
+        if (Number(fee_rate) < 1) {
             throw new ErrorResponse("Invalid query params", 400);
         }
         if (count && isNaN(Number(count))) {
@@ -63,80 +71,83 @@ app.get("/price", async (req: Request, res: Response, next: NextFunction) => {
         if (rareSats && !available_rarity.includes(rareSats)) {
             throw new ErrorResponse("Invalid query params", 400);
         }
-        const searchParams = new URLSearchParams({
-            size,
-            fee,
-            count: count || "1",
-            rareSats: rareSats || "random",
+
+        let totalFee = await calculatePrice({
+            fee: Number(fee_rate),
+            imageFileSizes: imageSizes.map(Number),
+            quantity: Number(count),
+            rareSats,
         });
-
-        let priceResponse = await needle(
-            "get",
-            `${process.env.ORDINALS_BOT_API_BASE_URL}/price?${searchParams}`,
-            { json: true, headers: { Accept: "application/json" } }
-        );
-
-        if (priceResponse.body.status !== "error") {
-            let fee =
-                priceResponse.body.totalFee + Number(process.env.REFERRAL_FEE);
-            return res.status(200).json({
-                message: "Price calculated",
-                data: {
-                    fee,
-                },
-                success: true,
-            });
-        } else {
-            throw buildOrdinalsBotError(priceResponse.body);
-        }
+        return res.status(200).json({
+            message: "Price calculated",
+            data: totalFee,
+            success: true,
+        });
     } catch (e) {
         next(e);
     }
 });
 
-app.get(
-    "/:address/status",
-    async (req: Request, res: Response, next: NextFunction) => {
-        try {
-            //first get the user address
-            let address = req.params.address;
+app.get("/orders", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        //first get the user address
+        let address = req.params.address;
 
-            //then check if the user has an order already and send back those details
-            let orders = await prisma.order.findMany({
-                where: {
-                    receiver_address: address,
-                },
-                select: {
-                    receiver_address: true,
-                    created_at: true,
-                    ordinals_bot_order_id: true,
-                    id: true,
-                    updated_at: true,
-                    status: true,
-                    quantity: true,
-                },
-            });
+        //then check if the user has an order already and send back those details
+        let orders = await prisma.order.findMany({
+            where: {
+                receiver_address: address,
+            },
+            select: {
+                receiver_address: true,
+                created_at: true,
+                ordinals_bot_order_id: true,
+                id: true,
+                updated_at: true,
+                status: true,
+                quantity: true,
+                total_fee: true,
+                html_ordinals: true,
+                payment_tx_id: true,
+            },
+        });
 
-            return res.status(200).json({
-                message: "Orders fetched successfully",
-                data: orders,
-                success: true,
-            });
-        } catch (e) {
-            next(e);
-        }
+        return res.status(200).json({
+            message: "Orders fetched successfully",
+            data: await Promise.all(
+                orders.map(async (order) => ({
+                    ...order,
+                    payment_details: {
+                        address: await getAddressByIndex(order.id),
+                        amount: order.total_fee,
+                    },
+                }))
+            ),
+            success: true,
+        });
+    } catch (e) {
+        next(e);
     }
-);
+});
 
 app.post(
     "/inscribe",
     async (req: Request, res: Response, next: NextFunction) => {
         try {
-            let { files, rarity, receiverAddress, quantity } = req.body as {
+            let {
+                files,
+                rarity,
+                receiverAddress,
+                quantity,
+                payAddress,
+                feeRate,
+            } = req.body as {
                 files: FileData[];
                 rarity: string;
                 receiverAddress: string;
+                payAddress: string;
                 quantity?: number;
+                feeRate: number;
             };
 
             validateOrderData({
@@ -144,82 +155,65 @@ app.post(
                 rarity,
                 receiverAddress,
                 quantity,
+                payAddress,
             });
+
             const namedFiles = files.map((file) => ({
                 ...file,
                 name: `${v4()}.${file.name.split(".").pop()}`,
             }));
-            // unique token for ordinals bot webhook
-            const orderToken = v4();
-            let data = {
-                files: namedFiles,
-                receiveAddress: receiverAddress,
-                fee: Number(process.env.MINING_FEE),
+
+            const detailed_fees = await calculatePrice({
+                fee: feeRate,
+                imageFileSizes: files.map((file) => file.size),
+                quantity,
                 rareSats: rarity,
-                lowPostage: true,
-                referral: process.env.REFERRAL_CODE,
-                additionalFee: Number(process.env.REFERRAL_FEE),
-                webhookUrl: `${process.env.BASE_URL}/inscribe/update-status/${orderToken}`,
-            };
-            let orderResponse = await needle(
-                "post",
-                `${process.env.ORDINALS_BOT_API_BASE_URL}/order`,
-                data,
-                {
-                    headers: {
-                        Accept: "application/json",
-                        "Content-Type": "application/json",
-                    },
-                }
-            );
-            const orderResponseData = orderResponse.body as
-                | OrdinalsBotCreateOrderResponse
-                | OrdinalsBotErrorResponse;
-            if (orderResponseData.status === "ok") {
-                //successful order
-                //save to the db
-                let newOrder = await prisma.order.create({
+            });
+            //successful order
+            //save to the db
+            const orderToken = v4();
+
+            let newOrder = await prisma.order.create({
+                data: {
+                    receiver_address: receiverAddress,
+                    update_token: orderToken,
+                    fee_rate: feeRate,
+                    quantity: quantity || 1,
+                    rarity,
+                    total_fee: detailed_fees.totalFee,
+                },
+            });
+
+            const orderResponseData = await ordinalsBotInscribe({
+                files: namedFiles,
+                order: newOrder,
+            });
+            for (const file of namedFiles) {
+                await prisma.ordinal.create({
                     data: {
-                        receiver_address: receiverAddress,
+                        image_files_order_id: newOrder.id,
+                        name: file.name,
+                        size: file.size,
+                        hash: await hashFile(file.dataURL),
+                        duration: file.duration,
+                        type: file.type,
                         ordinals_bot_order_id: orderResponseData.id,
-                        update_token: orderToken,
-                        quantity: quantity || 1,
                     },
-                    select: {
-                        id: true,
-                    },
-                });
-
-                for (let file of orderResponseData.files) {
-                    const fileData = namedFiles.find((item) =>
-                        file.name.includes(item.name)
-                    )!;
-                    await prisma.ordinal.create({
-                        data: {
-                            image_files_order_id: newOrder.id,
-                            name: file.name,
-                            size: file.size,
-                            hash: await hashFile(fileData.dataURL),
-                            duration: fileData.duration,
-                            type: file.type,
-                        },
-                    });
-                }
-
-                //send response to client
-                return res.status(200).json({
-                    message: "Inscribe Order pending",
-                    data: {
-                        ...newOrder,
-                        payment_details: {
-                            ...orderResponseData.charge,
-                        },
-                    },
-                    success: true,
                 });
             }
+            //send response to client
+            return res.status(200).json({
+                message: "Inscribe Order pending",
+                data: {
+                    id: newOrder.id,
+                    payment_details: {
+                        address: await getAddressByIndex(newOrder.id),
+                        amount: detailed_fees.totalFee,
+                    },
+                },
+                success: true,
+            });
             //an error occurred
-            throw buildOrdinalsBotError(orderResponseData);
         } catch (e) {
             next(e);
         }
@@ -237,19 +231,22 @@ app.post("/inscribe/update-status/:token", async (req, res, next) => {
             throw new ErrorResponse("Invalid order token", 401);
         }
 
-        const where = {
-            name: payload.file.name,
-            order: {
-                update_token: token,
-                ordinals_bot_order_id: payload.id,
-            },
-        };
-
         const existingFile = await prisma.ordinal.findFirst({
-            where,
-            include: {
-                html_files_order: true,
-                image_files_order: true,
+            where: {
+                name: payload.file.name,
+                ordinals_bot_order_id: payload.id,
+                OR: [
+                    {
+                        image_files_order: {
+                            update_token: token,
+                        },
+                    },
+                    {
+                        html_files_order: {
+                            update_token: token,
+                        },
+                    },
+                ],
             },
         });
 

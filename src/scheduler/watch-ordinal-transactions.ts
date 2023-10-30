@@ -3,6 +3,7 @@ import prisma from "../lib/prisma-client";
 import { OrderStatus, TransactionStatus } from "@prisma/client";
 import needle from "needle";
 import { MempoolTx } from "../types/mempool";
+import { checkAndInscribeCompleteOrders } from "./handleHTMLOrdinalsInscribe";
 
 const checkTx = async (txId: string) => {
     const result = await needle(
@@ -50,10 +51,12 @@ const checkTx = async (txId: string) => {
             status: OrderStatus.READY,
         },
     });
+
+    await checkAndInscribeCompleteOrders();
 };
 
 const watchOrdinalTransactionsTask = new AsyncTask(
-    "Watch unconfirmed transactions",
+    "Watch ordinal transactions",
     async () => {
         const unconfirmedTxs = await prisma.ordinal.findMany({
             where: {
@@ -65,7 +68,7 @@ const watchOrdinalTransactionsTask = new AsyncTask(
         });
 
         for (const tx of unconfirmedTxs) {
-            checkTx(tx.tx_id!);
+            await checkTx(tx.tx_id!);
         }
     }
 );
@@ -73,6 +76,10 @@ const watchOrdinalTransactionsTask = new AsyncTask(
 export const watchOrdinalTransactionsJob = new SimpleIntervalJob(
     {
         minutes: 3,
+        // seconds: 10,
     },
-    watchOrdinalTransactionsTask
+    watchOrdinalTransactionsTask,
+    {
+        preventOverrun: true,
+    }
 );
