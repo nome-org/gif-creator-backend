@@ -1,9 +1,9 @@
 import { AsyncTask, SimpleIntervalJob } from "toad-scheduler";
 import prisma from "../lib/prisma-client";
 import { Order, OrderStatus } from "@prisma/client";
-import { mempool } from "../lib/mempool/socket-client";
-import { getAddressByIndex } from "../lib/payments/bitcoin";
+import { mempool } from "../lib/mempool/mempool-client";
 import { handlePaidOrder } from "../lib/order-handlers/handle-paid-orders";
+import { getAddressByIndex } from "../lib/payments/server-keys";
 
 const checkAddress = async ({
     address,
@@ -54,7 +54,7 @@ const watchOrderPaymentTransactionsTask = new AsyncTask(
 
         for (const order of orders) {
             await checkAddress({
-                address: (await getAddressByIndex(order.id)) as string,
+                address: (await getAddressByIndex(order.id))!,
                 order,
             });
         }

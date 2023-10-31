@@ -13,10 +13,11 @@ import { OrdinalsBotWebhookPayload } from "./types/ordinals-bot";
 import { toadScheduler } from "./scheduler/toad";
 import { available_rarity } from "./constants/rarity";
 import { calculatePrice } from "./lib/calculatePrice";
-import { getAddressByIndex, getKeyByIndex } from "./lib/payments/bitcoin";
+
 import { v4 } from "uuid";
 import { ordinalsBotInscribe } from "./lib/ordinals-bot/inscribe";
 import { hashFile } from "./lib/hashfile";
+import { getAddressByIndex } from "./lib/payments/server-keys";
 const app = express();
 
 //load env
