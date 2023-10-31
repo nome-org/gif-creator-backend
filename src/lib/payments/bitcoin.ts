@@ -15,13 +15,11 @@ export const buildPaymentTx = async ({
     receiverAddress: string;
     feeRate: number;
 }) => {
-    console.log("just started fuck");
     const key = getKeyByIndex(keyIndex);
     const btc = await import("@scure/btc-signer");
     const tx = new btc.Transaction();
     const [utxo] = await getUTXOsByIndex(keyIndex);
 
-    console.log({ utxo });
     // const isSendingMax = utxo.value < amount;
 
     // const recommendedFee = await mempool.bitcoin.fees.getFeesRecommended();
@@ -35,7 +33,6 @@ export const buildPaymentTx = async ({
 
     const { inputs, outputs, fee } = determineUtxosForSpend(determineUtxosArgs);
 
-    console.log({ inputs, outputs, fee });
     if (!inputs.length) throw new Error("No inputs to sign");
     if (!outputs.length) throw new Error("No outputs to sign");
 
