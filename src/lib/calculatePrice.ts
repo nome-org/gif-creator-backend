@@ -96,7 +96,6 @@ export const calculatePrice = async ({
 
     const royalties = Number(process.env.REFERRAL_FEE);
     const paymentTxFees = getOrdinalsBotBitcoinFees(fee);
-    // first is for images and second is for html
     const totalPaymentFees = paymentTxFees * 2;
     const totalHTMLPrice = htmlPrice * quantity;
     const totalOrdinalBotFees = totalImagesPrice + totalHTMLPrice;

@@ -44,15 +44,15 @@ app.get("/price", async (req: Request, res: Response, next: NextFunction) => {
         const {
             imageSizes,
             fee: fee_rate,
-            count,
+            count = 1,
             rareSats,
         } = req.query as {
-            imageSizes: string[];
-            fee: string;
+            imageSizes?: string[];
+            fee?: string;
             count?: string;
             rareSats?: string;
         };
-        if (!imageSizes.length || !fee_rate) {
+        if (!imageSizes || !imageSizes.length || !fee_rate) {
             throw new ErrorResponse("Invalid query params", 400);
         }
         if (
@@ -73,7 +73,7 @@ app.get("/price", async (req: Request, res: Response, next: NextFunction) => {
             throw new ErrorResponse("Invalid query params", 400);
         }
 
-        const totalFee = await calculatePrice({
+        const feeDetails = await calculatePrice({
             fee: Number(fee_rate),
             imageFileSizes: imageSizes.map(Number),
             quantity: Number(count),
@@ -81,7 +81,7 @@ app.get("/price", async (req: Request, res: Response, next: NextFunction) => {
         });
         return res.status(200).json({
             message: "Price calculated",
-            data: totalFee,
+            data: feeDetails,
             success: true,
         });
     } catch (e) {
