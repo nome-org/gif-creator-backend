@@ -33,6 +33,7 @@ export const getOrdinalsBotPrice = async ({
         fee: String(fee),
         count: String(quantity),
         rareSats: rareSats,
+        lowPostage: "true",
     });
 
     const res = await needle(
