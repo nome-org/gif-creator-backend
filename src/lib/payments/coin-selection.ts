@@ -40,7 +40,8 @@ export function determineUtxosForSpend({
             input_script: "p2wpkh",
             input_count: neededUtxos.length + 1,
             // From the address of the recipient, we infer the output type
-            [addressInfo.type + "_output_count"]: 2,
+            [addressInfo.type + "_output_count"]: 1,
+            p2wpkh_output_count: 1,
         });
         if (
             sum >=

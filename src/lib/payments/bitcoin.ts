@@ -18,23 +18,25 @@ export const buildPaymentTx = async ({
     const key = getKeyByIndex(keyIndex);
     const btc = await import("@scure/btc-signer");
     const tx = new btc.Transaction();
-    const [utxo] = await getUTXOsByIndex(keyIndex);
 
+    let UTXOs = await getUTXOsByIndex(keyIndex);
+    if (!UTXOs.length) throw new Error("No inputs to sign");
     // console.log("utxo", utxo);
     // const isSendingMax = utxo.value < amount;
 
     // const recommendedFee = await mempool.bitcoin.fees.getFeesRecommended();
+    // only use the first one for now (just paranoia)
+    UTXOs = UTXOs.slice(0, 1);
 
     const determineUtxosArgs = {
         amount,
         feeRate,
         recipient: receiverAddress,
-        utxos: [utxo],
+        utxos: UTXOs,
     };
 
     const { inputs, outputs, fee } = determineUtxosForSpend(determineUtxosArgs);
 
-    console.log("inputs", inputs);
     if (!inputs.length) throw new Error("No inputs to sign");
     if (!outputs.length) throw new Error("No outputs to sign");
 
@@ -77,6 +79,5 @@ export const buildPaymentTx = async ({
 
 export const broadcastPaymentTx = async ({ hex }: { hex: string }) => {
     const res = await needle("post", `${process.env.MEMPOOL_BASE_URL}/tx`, hex);
-    console.log("mempool tx res", res);
-    return res.body;
+    return res.body as string;
 };

@@ -20,10 +20,8 @@ enum OrderStatus {
   UNPAID
   // then the user pays the payment tx can be seen on the blockchain
   PAYMENT_PENDING
-  PAYMENT_CONFIRMED
   // then the ordinals bot creates the image ordinals
   IMAGE_ORDINALS_PENDING
-  IMAGE_ORDINALS_CONFIRMED
   // then the ordinals bot creates the html ordinals
   HTML_ORDINALS_PENDING
   READY

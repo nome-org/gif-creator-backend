@@ -1,10 +1,9 @@
 import needle from "needle";
-import { buildGifHTMLMini } from "./gif/build-html";
-import { FileData } from "./validation/orders";
+import { buildGifHTML } from "./gif/build-html";
 
-import { TransactionStatus } from "@prisma/client";
 import { buildOrdinalsBotError } from "./error-response";
 import { OrdinalsBotErrorResponse } from "../types/ordinals-bot";
+import { BtcSizeFeeEstimator } from "./payments/btc-size-fee-estimator";
 
 export type ordinalsBotPriceRes = {
     chainFee: number;
@@ -50,6 +49,17 @@ export const getOrdinalsBotPrice = async ({
     }
 };
 
+const getOrdinalsBotBitcoinFees = (feeRate: number) => {
+    const txSizer = new BtcSizeFeeEstimator();
+    const { txVBytes } = txSizer.calcTxSize({
+        input_count: 1,
+        p2wpkh_output_count: 1,
+        p2sh_output_count: 1,
+    });
+
+    return txVBytes * feeRate;
+};
+
 export const calculatePrice = async ({
     fee,
     quantity = 1,
@@ -62,23 +72,11 @@ export const calculatePrice = async ({
     imageFileSizes: number[];
 }) => {
     const mappedFiles = imageFileSizes.map(() => ({
-        id: 12412,
-        created_at: new Date(),
-        updated_at: new Date(),
-        duration: 19999,
-        name: "c988941e55591e7b5930f6cc1d8d5046f5458a1c2641c29ae43f2a37359e57c5.webp",
-        hash: "c988941e55591e7b5930f6cc1d8d5046f5458a1c2641c29ae43f2a37359e57c5",
-        html_files_order_id: 1,
-        image_files_order_id: 1,
-        ordinal_index: 1,
-        size: 20_000,
-        tx_id: "tx_id",
-        tx_status: TransactionStatus.PENDING,
-        type: "image/webp",
-        ordinals_bot_order_id:
-            "c988941e55591e7b5930f6cc1d8d5046f5458a1c2641c29ae43f2a37359e57c5",
+        duration: 1000,
+        ordinal_index: 0,
+        tx_id: "d".repeat(64),
     }));
-    const htmlSize = buildGifHTMLMini("image.gif", mappedFiles).length;
+    const htmlSize = buildGifHTML("image.gif", mappedFiles).length;
     let totalImagesPrice = 0;
     for (const imageSize of imageFileSizes) {
         const { totalFee } = await getOrdinalsBotPrice({
@@ -95,8 +93,14 @@ export const calculatePrice = async ({
         rareSats,
     });
 
-    const serviceFee = Number(process.env.REFERRAL_FEE);
-    const totalFee = serviceFee + totalImagesPrice + htmlPrice * quantity;
+    const royalties = Number(process.env.REFERRAL_FEE);
+    const paymentTxFees = getOrdinalsBotBitcoinFees(fee);
+    // first is for images and second is for html
+    const totalPaymentFees = paymentTxFees * 2;
+    const totalHTMLPrice = htmlPrice * quantity;
+    const totalOrdinalBotFees = totalImagesPrice + totalHTMLPrice;
+    const totalServiceFees = royalties + totalPaymentFees;
+    const totalFee = totalOrdinalBotFees + totalServiceFees;
 
     return {
         totalFee,

@@ -43,22 +43,9 @@ export const handlePaidOrder = async (order: Order) => {
             },
             data: {
                 status: OrderStatus.IMAGE_ORDINALS_PENDING,
-                payment_tx_id: hex,
             },
         });
     } else {
         throw buildOrdinalsBotError(ordinalsBotOrderData);
     }
 };
-
-// export const handlePaidOrders = async () => {
-//     const paidOrders = await prisma.order.findMany({
-//         where: {
-//             status: OrderStatus.PAYMENT_CONFIRMED,
-//         },
-//     });
-
-//     for (const order of paidOrders) {
-//         handlePaidOrders(order)
-//     }
-// };

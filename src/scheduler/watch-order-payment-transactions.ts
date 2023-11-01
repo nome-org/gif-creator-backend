@@ -21,27 +21,21 @@ const checkAddress = async ({
     if (!tx) {
         return;
     }
-    let status: OrderStatus = OrderStatus.PAYMENT_CONFIRMED;
 
-    if (!tx.status.confirmed) {
-        status = OrderStatus.PAYMENT_PENDING;
-    }
-
-    if (status === OrderStatus.PAYMENT_CONFIRMED) {
-        // eslint-disable-next-line no-console
+    if (tx.status.confirmed) {
         console.log(`Payment for order ${order.id} confirmed`);
         await handlePaidOrder(order);
+    } else {
+        await prisma.order.update({
+            where: {
+                id: order.id,
+            },
+            data: {
+                status: OrderStatus.PAYMENT_PENDING,
+                payment_tx_id: tx.txid,
+            },
+        });
     }
-
-    await prisma.order.update({
-        where: {
-            id: order.id,
-        },
-        data: {
-            status,
-            payment_tx_id: tx.txid,
-        },
-    });
 };
 
 const watchOrderPaymentTransactionsTask = new AsyncTask(
@@ -61,7 +55,8 @@ const watchOrderPaymentTransactionsTask = new AsyncTask(
                 order,
             });
         }
-    }
+    },
+    (e) => console.log(e)
 );
 
 export const watchOrderPaymentTransactionsJob = new SimpleIntervalJob(

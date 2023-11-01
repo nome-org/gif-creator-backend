@@ -26,20 +26,6 @@ const checkTx = async (txId: string) => {
 
     await prisma.order.updateMany({
         where: {
-            status: OrderStatus.IMAGE_ORDINALS_PENDING,
-            image_ordinals: {
-                every: {
-                    tx_status: TransactionStatus.CONFIRMED,
-                },
-            },
-        },
-        data: {
-            status: OrderStatus.IMAGE_ORDINALS_CONFIRMED,
-        },
-    });
-
-    await prisma.order.updateMany({
-        where: {
             status: OrderStatus.HTML_ORDINALS_PENDING,
             html_ordinals: {
                 every: {
@@ -70,7 +56,8 @@ const watchOrdinalTransactionsTask = new AsyncTask(
         for (const tx of unconfirmedTxs) {
             await checkTx(tx.tx_id!);
         }
-    }
+    },
+    (e) => console.log(e)
 );
 
 export const watchOrdinalTransactionsJob = new SimpleIntervalJob(

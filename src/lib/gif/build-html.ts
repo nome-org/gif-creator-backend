@@ -1,10 +1,19 @@
-import { Ordinal } from "@prisma/client";
+import { minify } from "html-minifier";
 
-export const buildGifHTMLFull = (title: string, files: Ordinal[]) => {
-    return `
-<html lang="en">
+export const buildGifHTML = <
+    ordinalImageData extends {
+        duration: number;
+        tx_id: string;
+        ordinal_index: number;
+    }
+>(
+    title: string,
+    files: ordinalImageData[]
+) => {
+    return minify(
+        `
+<html>
     <head>
-        <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${title}</title>
         <style>
@@ -15,17 +24,18 @@ export const buildGifHTMLFull = (title: string, files: Ordinal[]) => {
                 height: 100vh;
                 margin: 0;
             }
-            .grid-item {
+            body > div > img {
                 display: none;
                 max-width: 100%;
-                height: auto;
+                width: 400px;
+                image-rendering: pixelated;
                 object-fit: cover;
             }
         </style>
         <script>
             const delay = (ms) => new Promise(res => setTimeout(res, ms));
             document.addEventListener("DOMContentLoaded", async () => {
-                const images = document.querySelector(".grid-container").children;
+                const images = document.querySelector("body > div").children;
                 const times = [${files.map((file) => file.duration).join(",")}];
                 let currentInDisplay = 0;
                 while (true) {
@@ -44,29 +54,23 @@ export const buildGifHTMLFull = (title: string, files: Ordinal[]) => {
         </script>
     </head>
 
-    <body style="margin: 0px; isolation: isolate;">
-        <div class="grid-container">
+    <body>
+        <div>
             ${files
                 .map(
                     (file) =>
-                        `<img class="grid-item" src="/content/${file.tx_id}i0">`
+                        `<img src="/content/${file.tx_id}i${file.ordinal_index}">`
                 )
                 .join("\n")}
         </div>
     </body>
 </html>
-`;
-};
-
-export const buildGifHTMLMini = (title: string, files: Ordinal[]) => {
-    return `<html lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>${title}</title><style>body{display:flex;justify-content:center;align-items:center;height:100vh;margin:0}.grid-item{display:none;max-width:100%;height:auto;object-fit:cover}</style><script>const e=e=>new Promise(t=>setTimeout(t,e));document.addEventListener("DOMContentLoaded",async()=>{const t=document.querySelector(".grid-container").children,n=[${files
-        .map((file) => file.duration)
-        .join(
-            ","
-        )}];let o=0;for(;;){const s=t.item(o),i=t.item((o||t.length)-1);await e(n[o]||1e3),i.style.setProperty("display","none"),s.style.setProperty("display","block"),o===t.length-1?o=0:o+=1}})</script><body style=margin:0;isolation:isolate><div class=grid-container>${files
-        .map(
-            (file) =>
-                `<img class=grid-item src=/content/${file.tx_id}i${file.ordinal_index}>`
-        )
-        .join("\n")}</div>    </body></html>`;
+`,
+        {
+            minifyCSS: true,
+            minifyJS: true,
+            preserveLineBreaks: false,
+            collapseWhitespace: true,
+        }
+    );
 };

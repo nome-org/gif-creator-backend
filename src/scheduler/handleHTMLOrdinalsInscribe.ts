@@ -1,17 +1,24 @@
-import { Order, OrderStatus, Ordinal } from "@prisma/client";
+import { Order, OrderStatus, Ordinal, TransactionStatus } from "@prisma/client";
 import prisma from "../lib/prisma-client";
-import { buildGifHTMLMini } from "../lib/gif/build-html";
 import { ordinalsBotInscribe } from "../lib/ordinals-bot/inscribe";
 import { base64 } from "@scure/base";
 import { utf8ToBytes } from "@noble/hashes/utils";
 import { hashFile } from "../lib/hashfile";
 import { broadcastPaymentTx, buildPaymentTx } from "../lib/payments/bitcoin";
 import { delay } from "../lib/util/delay";
+import { buildGifHTML } from "../lib/gif/build-html";
 
 const handleSingleOrder = async (
     order: Order & { image_ordinals: Ordinal[] }
 ) => {
-    const gifHTML = buildGifHTMLMini(`${order.id}.gif`, order.image_ordinals);
+    const gifHTML = buildGifHTML(
+        `${order.id}.gif`,
+        order.image_ordinals.map((ordinal) => ({
+            duration: ordinal.duration,
+            tx_id: ordinal.tx_id!,
+            ordinal_index: ordinal.ordinal_index || 0,
+        }))
+    );
 
     const htmlBytes = utf8ToBytes(gifHTML);
 
@@ -76,7 +83,12 @@ const handleSingleOrder = async (
 export const checkAndInscribeCompleteOrders = async () => {
     const imageCompleteOrdinals = await prisma.order.findMany({
         where: {
-            status: OrderStatus.IMAGE_ORDINALS_CONFIRMED,
+            image_ordinals: {
+                every: {
+                    tx_status: TransactionStatus.CONFIRMED,
+                },
+            },
+            status: OrderStatus.IMAGE_ORDINALS_PENDING,
         },
         include: {
             image_ordinals: true,
