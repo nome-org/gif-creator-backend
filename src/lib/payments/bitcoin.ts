@@ -1,8 +1,8 @@
-import { mempool } from "../mempool/mempool-client";
 import { determineUtxosForSpend } from "./coin-selection";
 import { getUTXOsByIndex } from "../mempool/getUTXOByIndex";
 import { getKeyByIndex } from "./server-keys";
 import { networkMode } from "./network";
+import needle from "needle";
 
 export const buildPaymentTx = async ({
     keyIndex,
@@ -20,6 +20,7 @@ export const buildPaymentTx = async ({
     const tx = new btc.Transaction();
     const [utxo] = await getUTXOsByIndex(keyIndex);
 
+    // console.log("utxo", utxo);
     // const isSendingMax = utxo.value < amount;
 
     // const recommendedFee = await mempool.bitcoin.fees.getFeesRecommended();
@@ -33,6 +34,7 @@ export const buildPaymentTx = async ({
 
     const { inputs, outputs, fee } = determineUtxosForSpend(determineUtxosArgs);
 
+    console.log("inputs", inputs);
     if (!inputs.length) throw new Error("No inputs to sign");
     if (!outputs.length) throw new Error("No outputs to sign");
 
@@ -70,11 +72,11 @@ export const buildPaymentTx = async ({
     tx.sign(key.privateKey!);
     tx.finalize();
 
-    return { hex: tx.hex, fee };
+    return { hex: tx.hex, fee, inputs, outputs };
 };
 
 export const broadcastPaymentTx = async ({ hex }: { hex: string }) => {
-    const res = mempool.bitcoin.transactions.postTx({ txhex: hex });
+    const res = await needle("post", `${process.env.MEMPOOL_BASE_URL}/tx`, hex);
     console.log("mempool tx res", res);
-    return res;
+    return res.body;
 };

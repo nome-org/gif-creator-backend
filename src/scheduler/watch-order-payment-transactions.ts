@@ -18,9 +18,19 @@ const checkAddress = async ({
 
     const [tx] = result;
 
+    if (!tx) {
+        return;
+    }
     let status: OrderStatus = OrderStatus.PAYMENT_CONFIRMED;
+
     if (!tx.status.confirmed) {
         status = OrderStatus.PAYMENT_PENDING;
+    }
+
+    if (status === OrderStatus.PAYMENT_CONFIRMED) {
+        // eslint-disable-next-line no-console
+        console.log(`Payment for order ${order.id} confirmed`);
+        await handlePaidOrder(order);
     }
 
     await prisma.order.update({
@@ -32,13 +42,6 @@ const checkAddress = async ({
             payment_tx_id: tx.txid,
         },
     });
-
-    if (status === OrderStatus.PAYMENT_CONFIRMED) {
-        console.log(`Payment for order ${order.id} confirmed`);
-        await handlePaidOrder(order);
-    }
-
-    return status;
 };
 
 const watchOrderPaymentTransactionsTask = new AsyncTask(

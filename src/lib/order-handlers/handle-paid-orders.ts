@@ -1,4 +1,4 @@
-import { Order, OrderStatus, TransactionStatus } from "@prisma/client";
+import { Order, OrderStatus } from "@prisma/client";
 import prisma from "../prisma-client";
 import {
     OrdinalsBotCreateOrderResponse,

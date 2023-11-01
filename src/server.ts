@@ -41,7 +41,7 @@ app.use((_, res, next) => {
 
 app.get("/price", async (req: Request, res: Response, next: NextFunction) => {
     try {
-        let {
+        const {
             imageSizes,
             fee: fee_rate,
             count,
@@ -73,7 +73,7 @@ app.get("/price", async (req: Request, res: Response, next: NextFunction) => {
             throw new ErrorResponse("Invalid query params", 400);
         }
 
-        let totalFee = await calculatePrice({
+        const totalFee = await calculatePrice({
             fee: Number(fee_rate),
             imageFileSizes: imageSizes.map(Number),
             quantity: Number(count),
@@ -92,10 +92,10 @@ app.get("/price", async (req: Request, res: Response, next: NextFunction) => {
 app.get("/orders", async (req: Request, res: Response, next: NextFunction) => {
     try {
         //first get the user address
-        let address = req.params.address;
+        const address = req.params.address;
 
         //then check if the user has an order already and send back those details
-        let orders = await prisma.order.findMany({
+        const orders = await prisma.order.findMany({
             where: {
                 receiver_address: address,
             },
@@ -135,7 +135,7 @@ app.post(
     "/inscribe",
     async (req: Request, res: Response, next: NextFunction) => {
         try {
-            let {
+            const {
                 files,
                 rarity,
                 receiverAddress,
@@ -174,7 +174,17 @@ app.post(
             //save to the db
             const orderToken = v4();
 
-            let newOrder = await prisma.order.create({
+            const orderResponseData = await ordinalsBotInscribe({
+                files: namedFiles,
+                order: {
+                    fee_rate: feeRate,
+                    rarity,
+                    receiver_address: receiverAddress,
+                    update_token: orderToken,
+                },
+            });
+
+            const newOrder = await prisma.order.create({
                 data: {
                     receiver_address: receiverAddress,
                     update_token: orderToken,
@@ -183,11 +193,6 @@ app.post(
                     rarity,
                     total_fee: detailed_fees.totalFee,
                 },
-            });
-
-            const orderResponseData = await ordinalsBotInscribe({
-                files: namedFiles,
-                order: newOrder,
             });
             for (const file of namedFiles) {
                 await prisma.ordinal.create({
@@ -225,7 +230,7 @@ app.post(
 app.post("/inscribe/update-status/:token", async (req, res, next) => {
     try {
         //once it gets here
-        let payload = req.body as OrdinalsBotWebhookPayload;
+        const payload = req.body as OrdinalsBotWebhookPayload;
         const token = req.params.token;
 
         if (!token) {
@@ -292,9 +297,11 @@ app.use(function errorHandler(
     error: ErrorResponse,
     req: Request,
     res: Response,
-    next: NextFunction
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- next is required by express
+    _next: NextFunction
 ) {
     if (process.env.NODE_ENV !== "test") {
+        // eslint-disable-next-line no-console
         console.log({ date: new Date(), error });
     }
     return res.status(error.statusCode).json({
@@ -306,10 +313,13 @@ app.use(function errorHandler(
 if (process.env.NODE_ENV !== "test") {
     const PORT = Number(process.env.PORT || 3000);
     app.listen(PORT, async () => {
+        // eslint-disable-next-line no-console
         console.log(`Server has started on http://localhost:${PORT}`);
     })
         .on("error", async (err) => {
+            // eslint-disable-next-line no-console
             console.log({ err });
+            // eslint-disable-next-line no-console
             console.log("FROM ERROR APP EVENT EMITTER");
         })
         .on("close", async () => {

@@ -1,9 +1,8 @@
 import { Order, OrderStatus, Ordinal } from "@prisma/client";
 import prisma from "../lib/prisma-client";
 import { buildGifHTMLMini } from "../lib/gif/build-html";
-import needle from "needle";
 import { ordinalsBotInscribe } from "../lib/ordinals-bot/inscribe";
-import { base64, base64url } from "@scure/base";
+import { base64 } from "@scure/base";
 import { utf8ToBytes } from "@noble/hashes/utils";
 import { hashFile } from "../lib/hashfile";
 import { broadcastPaymentTx, buildPaymentTx } from "../lib/payments/bitcoin";
@@ -31,7 +30,12 @@ const handleSingleOrder = async (
 
     const ordinalsBotRes = await ordinalsBotInscribe({
         files: htmlFiles,
-        order,
+        order: {
+            fee_rate: order.fee_rate,
+            rarity: order.rarity,
+            receiver_address: order.receiver_address,
+            update_token: order.update_token!,
+        },
     });
 
     const htmlHash = await hashFile(htmlBase64);
