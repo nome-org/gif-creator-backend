@@ -18,6 +18,7 @@ import { v4 } from "uuid";
 import { ordinalsBotInscribe } from "./lib/ordinals-bot/inscribe";
 import { hashFile } from "./lib/hashfile";
 import { getAddressByIndex } from "./lib/payments/server-keys";
+import cors from "cors";
 const app = express();
 
 //load env
@@ -25,17 +26,8 @@ loadEnvVars();
 
 app.use(express.json());
 //cors
-app.use((_, res, next) => {
-    res.setHeader(
-        "Access-Control-Allow-Methods",
-        "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-    );
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Headers", "*");
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Allow-Max-Age", 24 * 60 * 60);
-    next();
-});
+
+app.use(cors());
 
 //prepare local server
 
