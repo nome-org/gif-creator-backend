@@ -7,6 +7,7 @@ import {
 import needle from "needle";
 import { broadcastPaymentTx, buildPaymentTx } from "../payments/bitcoin";
 import { buildOrdinalsBotError } from "../error-response";
+import { logger } from "../../server";
 
 export const handlePaidOrder = async (order: Order) => {
     const imageOrdinal = await prisma.ordinal.findFirst({
@@ -27,7 +28,7 @@ export const handlePaidOrder = async (order: Order) => {
         | OrdinalsBotErrorResponse;
 
     if (ordinalsBotOrderData.status === "ok") {
-        console.log(
+        logger.info(
             `sending ${ordinalsBotOrderData.charge.amount} to ${ordinalsBotOrderData.charge.address}`
         );
         const { hex } = await buildPaymentTx({

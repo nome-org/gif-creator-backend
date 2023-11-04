@@ -21,7 +21,6 @@ export const buildPaymentTx = async ({
 
     let UTXOs = await getUTXOsByIndex(keyIndex);
     if (!UTXOs.length) throw new Error("No inputs to sign");
-    // console.log("utxo", utxo);
     // const isSendingMax = utxo.value < amount;
 
     // const recommendedFee = await mempool.bitcoin.fees.getFeesRecommended();

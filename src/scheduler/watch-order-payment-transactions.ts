@@ -4,6 +4,7 @@ import { Order, OrderStatus } from "@prisma/client";
 import { mempool } from "../lib/mempool/mempool-client";
 import { handlePaidOrder } from "../lib/order-handlers/handle-paid-orders";
 import { getAddressByIndex } from "../lib/payments/server-keys";
+import { logger } from "../server";
 
 const checkAddress = async ({
     address,
@@ -23,7 +24,7 @@ const checkAddress = async ({
     }
 
     if (tx.status.confirmed) {
-        console.log(`Payment for order ${order.id} confirmed`);
+        logger.info(`Payment for order ${order.id} confirmed`);
         await handlePaidOrder(order);
     } else {
         await prisma.order.update({
@@ -56,7 +57,7 @@ const watchOrderPaymentTransactionsTask = new AsyncTask(
             });
         }
     },
-    (e) => console.log(e)
+    (e) => logger.error(e)
 );
 
 export const watchOrderPaymentTransactionsJob = new SimpleIntervalJob(

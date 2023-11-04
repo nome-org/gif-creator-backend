@@ -5,5 +5,5 @@ import { config as serverConfig } from "./server-config";
 
 loadEnvVars();
 
-const { app } = createServer(serverConfig, routing);
-export { app };
+const { app, logger } = createServer(serverConfig, routing);
+export { app, logger };

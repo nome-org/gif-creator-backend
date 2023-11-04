@@ -4,6 +4,7 @@ import { OrderStatus, TransactionStatus } from "@prisma/client";
 import needle from "needle";
 import { MempoolTx } from "../types/mempool";
 import { checkAndInscribeCompleteOrders } from "./handleHTMLOrdinalsInscribe";
+import { logger } from "../server";
 
 const checkTx = async (txId: string) => {
     const result = await needle(
@@ -57,7 +58,7 @@ const watchOrdinalTransactionsTask = new AsyncTask(
             await checkTx(tx.tx_id!);
         }
     },
-    (e) => console.log(e)
+    (e) => logger.error(e)
 );
 
 export const watchOrdinalTransactionsJob = new SimpleIntervalJob(
