@@ -1,4 +1,4 @@
-import { defaultEndpointsFactory } from "express-zod-api";
+import { defaultEndpointsFactory, ez } from "express-zod-api";
 import { z } from "zod";
 import prisma from "../lib/prisma-client";
 import { getAddressByIndex } from "../lib/payments/server-keys";
@@ -14,9 +14,9 @@ export const getOrdersEndpoint = defaultEndpointsFactory.build({
         data: z.array(
             z.object({
                 receiver_address: z.string(),
-                created_at: z.date(),
+                created_at: ez.dateOut(),
                 id: z.number(),
-                updated_at: z.date(),
+                updated_at: ez.dateOut(),
                 status: z.enum([
                     OrderStatus.PAYMENT_PENDING,
                     OrderStatus.HTML_ORDINALS_PENDING,
