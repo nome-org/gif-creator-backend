@@ -25,7 +25,7 @@ export const ordinalsBotInscribe = async ({
         fee: order.fee_rate,
         rareSats: order.rarity,
         lowPostage: true,
-        webhookUrl: `${process.env.BASE_URL}/inscribe/update-status/${order.update_token}`,
+        webhookUrl: `${process.env.BASE_URL}/${order.update_token}`,
     };
     const orderResponse = await needle(
         "post",
