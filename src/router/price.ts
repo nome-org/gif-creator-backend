@@ -22,7 +22,7 @@ export const getPriceEndpoint = defaultEndpointsFactory.build({
             .default("1")
             .transform(Number)
             .refine((x) => x > 0),
-        rareSats: z.string(z.enum(available_rarity)).default("random"),
+        rareSats: z.enum(available_rarity).default("random"),
     }),
     output: z.object({
         totalFee: safeInt,
