@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { safeInt } from "./zod-extras";
 
 export const ordinalsBotErrorResponseSchema = z.union([
     z.object({
@@ -18,7 +19,7 @@ const createdAtSchema = z.object({
 });
 
 const lightningInvoiceSchema = z.object({
-    expires_at: z.number(),
+    expires_at: safeInt,
     payreq: z.string(),
 });
 
@@ -27,7 +28,7 @@ const chainInvoiceSchema = z.object({
 });
 
 const fileSchema = z.object({
-    size: z.number(),
+    size: safeInt,
     type: z.string(),
     name: z.string(),
     url: z.string(),
@@ -36,12 +37,12 @@ const fileSchema = z.object({
 
 const webhookFileSchema = fileSchema.extend({
     iqueued: z.boolean(),
-    iqueuedAt: z.number(),
+    iqueuedAt: safeInt,
 });
 
 const txSchema = z.object({
     commit: z.string(),
-    fees: z.number(),
+    fees: safeInt,
     inscription: z.string(),
     reveal: z.string(),
     satpoint: z.string(),
@@ -52,28 +53,28 @@ const chargeSchema = z.object({
     id: z.string(),
     description: z.string(),
     desc_hash: z.boolean(),
-    created_at: z.number(),
+    created_at: safeInt,
     status: z.string(),
-    amount: z.number(),
+    amount: safeInt,
     callback_url: z.string().optional(),
     success_url: z.string().optional(),
     hosted_checkout_url: z.string(),
     order_id: z.string().optional(),
     currency: z.string(),
-    source_fiat_value: z.number(),
-    fiat_value: z.number(),
+    source_fiat_value: safeInt,
+    fiat_value: safeInt,
     auto_settle: z.boolean(),
     notif_email: z.string().optional(),
     address: z.string(),
     chain_invoice: chainInvoiceSchema,
     uri: z.string(),
-    ttl: z.number(),
+    ttl: safeInt,
     lightning_invoice: lightningInvoiceSchema,
 });
 
 export const ordinalsBotWebhookPayloadSchema = z.object({
     id: z.string(),
-    index: z.number(),
+    index: safeInt,
     file: webhookFileSchema,
     tx: txSchema,
 });
@@ -83,12 +84,12 @@ export const ordinalsBotCreateOrderResponseSchema = z.object({
     files: z.array(fileSchema),
     lowPostage: z.boolean(),
     charge: chargeSchema,
-    chainFee: z.number(),
-    serviceFee: z.number(),
-    fee: z.number(),
-    baseFee: z.number(),
-    rareSatsFee: z.number(),
-    postage: z.number(),
+    chainFee: safeInt,
+    serviceFee: safeInt,
+    fee: safeInt,
+    baseFee: safeInt,
+    rareSatsFee: safeInt,
+    postage: safeInt,
     referral: z.string().optional(),
     rareSats: z.string(),
     receiveAddress: z.string(),

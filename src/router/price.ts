@@ -2,6 +2,7 @@ import { defaultEndpointsFactory } from "express-zod-api";
 import { available_rarity } from "../constants/rarity";
 import z from "zod";
 import { calculatePrice } from "../lib/calculatePrice";
+import { safeInt } from "../types/zod-extras";
 
 export const getPriceEndpoint = defaultEndpointsFactory.build({
     method: "get",
@@ -17,7 +18,7 @@ export const getPriceEndpoint = defaultEndpointsFactory.build({
         rareSats: z.string(z.enum(available_rarity)).default("random"),
     }),
     output: z.object({
-        totalFee: z.number(),
+        totalFee: safeInt,
     }),
     handler: async ({ input: { imageSizes, fee_rate, count, rareSats } }) => {
         const feeDetails = await calculatePrice({
