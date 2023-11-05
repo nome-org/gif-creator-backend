@@ -7,32 +7,30 @@ import { hashFile } from "../lib/hashfile";
 import prisma from "../lib/prisma-client";
 import { getAddressByIndex } from "../lib/payments/server-keys";
 import { available_rarity } from "../constants/rarity";
+import { safeInt } from "../types/zod-extras";
+
+const fileData = z.object({
+    name: z.string(),
+    size: safeInt,
+    dataURL: z.string(),
+    duration: safeInt,
+    type: z.string(),
+});
 
 export const createOrderEndpoint = defaultEndpointsFactory.build({
     method: "post",
     input: z.object({
-        files: z
-            .array(
-                z.object({
-                    name: z.string(),
-                    size: z.number(),
-                    dataURL: z.string(),
-                    duration: z.number(),
-                    type: z.string(),
-                })
-            )
-            .min(1)
-            .nonempty(),
+        files: z.array(fileData).min(1).nonempty(),
         rarity: z.enum(available_rarity).default("random"),
         receiverAddress: z.string(),
-        quantity: z.number().optional().default(1),
-        feeRate: z.number(),
+        quantity: safeInt.default(1),
+        feeRate: safeInt,
     }),
     output: z.object({
-        id: z.number(),
+        id: safeInt,
         payment_details: z.object({
             address: z.string(),
-            amount: z.number(),
+            amount: safeInt,
         }),
     }),
     handler: async ({
