@@ -32,9 +32,9 @@ describe("Orders Endpoints", () => {
                     files: [
                         {
                             size: 10,
-                            type: "plain/text",
+                            type: "image/webp",
                             name: "my-text-inscription-file-2.txt",
-                            dataURL: "data:plain/text;base64,dGVzdCBvcmRlcg==",
+                            dataURL: "data:image/webp;base64,dGVzdCBvcmRlcg==",
                             duration: 1200,
                         },
                     ],
@@ -62,12 +62,20 @@ describe("Orders Endpoints", () => {
                 body: {
                     files: [],
                     rarity: "2009",
-                    payAddress: "0x123456789",
-                    receiverAddress: "0x123456789",
+                    payAddress: "2N1YtccU92ZWQmyBCfo77qGbqXCKfxp7wkP",
+                    receiverAddress:
+                        "tb1pwjt7j5ztg5vw7y4havg4gaemlzkq8fhgrwltvldeq4fay22m60rqf920wy",
                 },
             },
         });
         expect(prismaMock.order.create).toBeCalledTimes(0);
+        expect(responseMock.json).toBeCalledWith({
+            status: "error",
+            error: {
+                message:
+                    "files: Must have at least one file; feeRate: Required",
+            },
+        });
         expect(responseMock.status).toBeCalledWith(400);
     });
 
@@ -92,6 +100,6 @@ describe("Orders Endpoints", () => {
             },
         });
 
-        expect(responseMock.status).toBeCalledWith(400);
+        expect(responseMock.status).toBeCalledWith(500);
     });
 });
