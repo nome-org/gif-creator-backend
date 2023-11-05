@@ -3,12 +3,12 @@ import { z } from "zod";
 import prisma from "../lib/prisma-client";
 import { getAddressByIndex } from "../lib/payments/server-keys";
 import { OrderStatus } from "@prisma/client";
-import { safeInt } from "../types/zod-extras";
+import { safeInt, taprootAddress } from "../types/zod-extras";
 
 export const getOrdersEndpoint = defaultEndpointsFactory.build({
     method: "get",
     input: z.object({
-        address: z.string(),
+        address: taprootAddress,
         page: z.number().safe().min(1).default(1),
     }),
     output: z.object({
