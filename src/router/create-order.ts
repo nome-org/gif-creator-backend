@@ -7,24 +7,28 @@ import { hashFile } from "../lib/hashfile";
 import prisma from "../lib/prisma-client";
 import { getAddressByIndex } from "../lib/payments/server-keys";
 import { available_rarity } from "../constants/rarity";
-import { safeInt } from "../types/zod-extras";
+import { safeInt, taprootAddress } from "../types/zod-extras";
 
+const maxFileSize = 200_000;
+const base64Overhead = 4 * (maxFileSize / 3);
 const fileData = z.object({
-    name: z.string(),
-    size: safeInt,
-    dataURL: z.string(),
+    name: z.string().max(150, "File name too long"),
+    size: safeInt.max(maxFileSize, "File too large"),
+    dataURL: z.string().max(+base64Overhead, "File too large"),
     duration: safeInt,
-    type: z.string(),
+    type: z
+        .string()
+        .refine((x) => x === "image/webp", "Only webp images are supported"),
 });
 
 export const createOrderEndpoint = defaultEndpointsFactory.build({
     method: "post",
     input: z.object({
-        files: z.array(fileData).min(1).nonempty(),
+        files: z.array(fileData).min(1).nonempty("Must have at least one file"),
         rarity: z.enum(available_rarity).default("random"),
-        receiverAddress: z.string(),
+        receiverAddress: taprootAddress,
         quantity: safeInt.default(1),
-        feeRate: safeInt,
+        feeRate: safeInt.max(1000, "No way brah too much fee monies"),
     }),
     output: z.object({
         id: safeInt,
