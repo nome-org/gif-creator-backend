@@ -2,23 +2,16 @@ import { defaultEndpointsFactory } from "express-zod-api";
 import ErrorResponse from "../lib/error-response";
 import prisma from "../lib/prisma-client";
 import z from "zod";
+import { ordinalsBotWebhookPayloadSchema } from "../types/ordinals-bot";
 
 export const updateOrderWebhook = defaultEndpointsFactory.build({
     method: "post",
-    input: z.object({
-        token: z.string(),
-        id: z.string(),
-        file: z.object({
-            name: z.string(),
-            size: z.number(),
-            dataURL: z.string(),
-            duration: z.number(),
-            type: z.string(),
-        }),
-        tx: z.object({
-            inscription: z.string(),
-        }),
-    }),
+    input: z.intersection(
+        ordinalsBotWebhookPayloadSchema,
+        z.object({
+            token: z.string(),
+        })
+    ),
     output: z.object({
         id: z.string(),
         success: z.boolean(),
