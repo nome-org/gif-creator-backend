@@ -1,96 +1,107 @@
-export type OrdinalsBotErrorResponse =
-    | {
-          status: "error";
-          error: string;
-          reason: never;
-      }
-    | {
-          status: "error";
-          error: never;
-          reason: string;
-      };
+import { z } from "zod";
 
-export interface OrdinalsBotCreateOrderResponse {
-    id: string;
-    files: File[];
-    lowPostage: boolean;
-    charge: Charge;
-    chainFee: number;
-    serviceFee: number;
-    fee: number;
-    baseFee: number;
-    rareSatsFee: number;
-    postage: number;
-    referral?: string;
-    rareSats: string;
-    receiveAddress: string;
-    webhookUrl: string;
-    status: "ok";
-    orderType: string;
-    state: string;
-    createdAt: CreatedAt;
-}
+export const ordinalsBotErrorResponseSchema = z.union([
+    z.object({
+        status: z.literal("error"),
+        error: z.string(),
+        reason: z.never(),
+    }),
+    z.object({
+        status: z.literal("error"),
+        error: z.never(),
+        reason: z.string(),
+    }),
+]);
 
-interface CreatedAt {
-    ".sv": string;
-}
+const createdAtSchema = z.object({
+    ".sv": z.string(),
+});
 
-interface Charge {
-    id: string;
-    description: string;
-    desc_hash: boolean;
-    created_at: number;
-    status: string;
-    amount: number;
-    callback_url?: string;
-    success_url?: string;
-    hosted_checkout_url: string;
-    order_id?: string;
-    currency: string;
-    source_fiat_value: number;
-    fiat_value: number;
-    auto_settle: boolean;
-    notif_email?: string;
-    address: string;
-    chain_invoice: Chaininvoice;
-    uri: string;
-    ttl: number;
-    lightning_invoice: Lightninginvoice;
-}
+const lightningInvoiceSchema = z.object({
+    expires_at: z.number(),
+    payreq: z.string(),
+});
 
-interface Lightninginvoice {
-    expires_at: number;
-    payreq: string;
-}
+const chainInvoiceSchema = z.object({
+    address: z.string(),
+});
 
-interface Chaininvoice {
-    address: string;
-}
+const fileSchema = z.object({
+    size: z.number(),
+    type: z.string(),
+    name: z.string(),
+    url: z.string(),
+    s3Key: z.string(),
+});
 
-interface File {
-    size: number;
-    type: string;
-    name: string;
-    url: string;
-    s3Key: string;
-}
+const webhookFileSchema = fileSchema.extend({
+    iqueued: z.boolean(),
+    iqueuedAt: z.number(),
+});
 
-export interface OrdinalsBotWebhookPayload {
-    id: string;
-    index: number;
-    file: WebhookFile;
-    tx: Tx;
-}
+const txSchema = z.object({
+    commit: z.string(),
+    fees: z.number(),
+    inscription: z.string(),
+    reveal: z.string(),
+    satpoint: z.string(),
+    updatedAt: z.string(),
+});
 
-interface WebhookFile extends File {
-    iqueued: boolean;
-    iqueuedAt: number;
-}
-interface Tx {
-    commit: string;
-    fees: number;
-    inscription: string;
-    reveal: string;
-    satpoint: string;
-    updatedAt: string;
-}
+const chargeSchema = z.object({
+    id: z.string(),
+    description: z.string(),
+    desc_hash: z.boolean(),
+    created_at: z.number(),
+    status: z.string(),
+    amount: z.number(),
+    callback_url: z.string().optional(),
+    success_url: z.string().optional(),
+    hosted_checkout_url: z.string(),
+    order_id: z.string().optional(),
+    currency: z.string(),
+    source_fiat_value: z.number(),
+    fiat_value: z.number(),
+    auto_settle: z.boolean(),
+    notif_email: z.string().optional(),
+    address: z.string(),
+    chain_invoice: chainInvoiceSchema,
+    uri: z.string(),
+    ttl: z.number(),
+    lightning_invoice: lightningInvoiceSchema,
+});
+
+export const ordinalsBotWebhookPayloadSchema = z.object({
+    id: z.string(),
+    index: z.number(),
+    file: webhookFileSchema,
+    tx: txSchema,
+});
+
+export const ordinalsBotCreateOrderResponseSchema = z.object({
+    id: z.string(),
+    files: z.array(fileSchema),
+    lowPostage: z.boolean(),
+    charge: chargeSchema,
+    chainFee: z.number(),
+    serviceFee: z.number(),
+    fee: z.number(),
+    baseFee: z.number(),
+    rareSatsFee: z.number(),
+    postage: z.number(),
+    referral: z.string().optional(),
+    rareSats: z.string(),
+    receiveAddress: z.string(),
+    webhookUrl: z.string(),
+    status: z.literal("ok"),
+    orderType: z.string(),
+    state: z.string(),
+    createdAt: createdAtSchema,
+});
+
+export type OrdinalsBotErrorResponse = z.infer<
+    typeof ordinalsBotErrorResponseSchema
+>;
+export type OrdinalsBotCreateOrderResponse = z.infer<
+    typeof ordinalsBotCreateOrderResponseSchema
+>;
