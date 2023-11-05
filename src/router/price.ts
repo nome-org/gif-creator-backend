@@ -7,14 +7,21 @@ import { safeInt } from "../types/zod-extras";
 export const getPriceEndpoint = defaultEndpointsFactory.build({
     method: "get",
     input: z.object({
-        imageSizes: z
-            .array(z.string().transform(Number))
-            .refine((x) => x.every((y) => y > 0)),
+        imageSizes: z.array(
+            z
+                .string()
+                .transform(Number)
+                .refine((x) => x > 0)
+        ),
         fee_rate: z
             .string()
             .transform(Number)
             .refine((x) => x > 0),
-        count: z.string().default("1").transform(Number),
+        count: z
+            .string()
+            .default("1")
+            .transform(Number)
+            .refine((x) => x > 0),
         rareSats: z.string(z.enum(available_rarity)).default("random"),
     }),
     output: z.object({
