@@ -3,37 +3,32 @@ import { z } from "zod";
 import prisma from "../lib/prisma-client";
 import { getAddressByIndex } from "../lib/payments/server-keys";
 import { OrderStatus } from "@prisma/client";
+import { safeInt } from "../types/zod-extras";
 
 export const getOrdersEndpoint = defaultEndpointsFactory.build({
     method: "get",
     input: z.object({
         address: z.string(),
-        page: z.number().optional(),
+        page: z.number().safe().min(1).default(1),
     }),
     output: z.object({
         data: z.array(
             z.object({
                 receiver_address: z.string(),
                 created_at: ez.dateOut(),
-                id: z.number(),
+                id: safeInt,
                 updated_at: ez.dateOut(),
-                status: z.enum([
-                    OrderStatus.PAYMENT_PENDING,
-                    OrderStatus.HTML_ORDINALS_PENDING,
-                    OrderStatus.IMAGE_ORDINALS_PENDING,
-                    OrderStatus.UNPAID,
-                    OrderStatus.READY,
-                ]),
-                quantity: z.number(),
-                total_fee: z.number(),
+                status: z.nativeEnum(OrderStatus),
+                quantity: safeInt,
+                total_fee: safeInt,
                 payment_tx_id: z.string().optional(),
                 payment_details: z.object({
                     address: z.string(),
-                    amount: z.number(),
+                    amount: safeInt,
                 }),
             })
         ),
-        total: z.number(),
+        total: safeInt,
     }),
     handler: async ({ input: { address, page } }) => {
         //first get the user address
@@ -53,7 +48,7 @@ export const getOrdersEndpoint = defaultEndpointsFactory.build({
                 total_fee: true,
             },
             take: 10,
-            skip: page ? page * 10 : 0,
+            skip: (page - 1) * 10,
         });
 
         const total = await prisma.order.count({
