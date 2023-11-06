@@ -61,7 +61,7 @@ describe("Orders Endpoints", () => {
                 method: "POST",
                 body: {
                     files: [],
-                    rarity: "2009",
+                    rarity: "random",
                     payAddress: "2N1YtccU92ZWQmyBCfo77qGbqXCKfxp7wkP",
                     receiverAddress:
                         "tb1pwjt7j5ztg5vw7y4havg4gaemlzkq8fhgrwltvldeq4fay22m60rqf920wy",
@@ -94,7 +94,7 @@ describe("Orders Endpoints", () => {
                         },
                     ],
 
-                    rarity: "2009",
+                    rarity: "random",
                     receiverAddress: "",
                 },
             },
