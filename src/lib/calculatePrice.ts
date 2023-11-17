@@ -39,7 +39,13 @@ export const getOrdinalsBotPrice = async ({
     const res = await needle(
         "get",
         `${process.env.ORDINALS_BOT_API_BASE_URL}/price?${searchParams}`,
-        { json: true, headers: { Accept: "application/json" } }
+        {
+            json: true,
+            headers: {
+                Accept: "application/json",
+                "x-api-key": process.env.ORDINALS_BOT_API_KEY,
+            },
+        }
     );
     const priceData: ordinalsBotPriceRes = res.body;
     const errorData: OrdinalsBotErrorResponse = res.body;

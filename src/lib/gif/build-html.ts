@@ -10,60 +10,58 @@ export const buildGifHTML = <
     title: string,
     files: ordinalImageData[]
 ) => {
+    const firstImage = `${files[0].tx_id}i${files[0].ordinal_index}`;
+    const imagesList = files
+        .map((f) => `"${f.tx_id}i${f.ordinal_index}"`)
+        .join(",\n");
+
     return minify(
         `
 <html>
-    <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${title}</title>
-        <style>
-            body {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-                margin: 0;
-            }
-            body > div > img {
-                display: none;
-                max-width: 100%;
-                width: 400px;
-                image-rendering: pixelated;
-                object-fit: cover;
-            }
-        </style>
-        <script>
-            const delay = (ms) => new Promise(res => setTimeout(res, ms));
-            document.addEventListener("DOMContentLoaded", async () => {
-                const images = document.querySelector("body > div").children;
-                const times = [${files.map((file) => file.duration).join(",")}];
-                let currentInDisplay = 0;
-                while (true) {
-                    const currentImage = images.item(currentInDisplay);
-                    const previousImage = images.item((currentInDisplay || images.length) - 1);
-                    await delay(times[currentInDisplay] || 1000);
-                    previousImage.style.setProperty("display", "none");
-                    currentImage.style.setProperty("display", "block");
-                    if (currentInDisplay === images.length - 1) {
-                        currentInDisplay = 0;
-                    } else {
-                        currentInDisplay += 1;
-                    }
+<head>
+    <title>${title}</title>
+</head>
+<body>
+    <img id="gif" style="width:100%; height: 100%;" src="/content/${firstImage}" />
+    <script src="/content/f6ed1320befc0932761caad4e7f457e52a9af5e182af105933663fac5fa6c385i0"></script>
+    <script>
+        let ou = URL.createObjectURL
+        function mb(src) {
+            return new Promise((res) => {
+                let canvas = document.createElement('canvas');
+                let context = canvas.getContext('2d');
+                let base_image = new Image();
+                base_image.crossOrigin = "Anonymous";
+                base_image.src = src;
+                base_image.onload = () => {
+                    let {width, height} = base_image;
+                    canvas.width = width;
+                    canvas.height = height
+                    context.drawImage(base_image,0,0, width, height, 0, 0, width, height);
+                    res(canvas);
                 }
             });
-        </script>
-    </head>
-
-    <body>
-        <div>
-            ${files
-                .map(
-                    (file) =>
-                        `<img src="/content/${file.tx_id}i${file.ordinal_index}">`
-                )
-                .join("\n")}
-        </div>
-    </body>
+        }
+        
+        fetch("/content/31092f07be03ab4a2e9a663dfdfd22742476508332ec0ae8dd30dc44d6ccc410i0")
+            .then(res => res.blob())
+            .then(async blob => {
+                let images = [${imagesList}],
+                gif = new GIF({
+                    workerScript: ou(blob),
+                });
+                
+                for (let image of images) {
+                    gif.addFrame(await mb("/content/" + image), {
+                        delay: 1000
+                    });
+                }
+                gif.on('finished', (blob) => {
+                    document.querySelector("#gif").src = ou(blob);
+                }).render();
+            });
+    </script>
+</body>
 </html>
 `,
         {

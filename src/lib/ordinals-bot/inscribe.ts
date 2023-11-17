@@ -35,6 +35,7 @@ export const ordinalsBotInscribe = async ({
             headers: {
                 Accept: "application/json",
                 "Content-Type": "application/json",
+                "x-api-key": process.env.ORDINALS_BOT_API_KEY,
             },
         }
     );
