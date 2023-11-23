@@ -21,7 +21,7 @@ export const getOrdersEndpoint = defaultEndpointsFactory.build({
                 status: z.nativeEnum(OrderStatus),
                 quantity: safeInt,
                 total_fee: safeInt,
-                payment_tx_id: z.string().optional(),
+                payment_tx_id: z.string().nullable(),
                 payment_details: z.object({
                     address: z.string(),
                     amount: safeInt,
@@ -46,6 +46,7 @@ export const getOrdersEndpoint = defaultEndpointsFactory.build({
                 status: true,
                 quantity: true,
                 total_fee: true,
+                payment_tx_id: true,
             },
             take: 10,
             skip: (page - 1) * 10,
