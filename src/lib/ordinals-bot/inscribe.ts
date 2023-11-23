@@ -27,16 +27,21 @@ export const ordinalsBotInscribe = async ({
         lowPostage: true,
         webhookUrl: `${process.env.BASE_URL}/orders/${order.update_token}`,
     };
+
+    const headers: { [x: string]: string } = {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+    };
+    const apiKey = process.env.ORDINALS_BOT_API_KEY;
+    if (apiKey) {
+        headers["x-api-key"] = apiKey;
+    }
     const orderResponse = await needle(
         "post",
         `${process.env.ORDINALS_BOT_API_BASE_URL}/order`,
         data,
         {
-            headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-                "x-api-key": process.env.ORDINALS_BOT_API_KEY,
-            },
+            headers,
         }
     );
     const orderResponseData = orderResponse.body as
