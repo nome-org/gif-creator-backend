@@ -34,6 +34,7 @@ export const getOrdinalsBotPrice = async ({
         count: String(quantity),
         rareSats: rareSats,
         lowPostage: "true",
+        baseFee: process.env.ORDINALS_BOT_BASE_FEE || "0",
     });
 
     const headers: { [x: string]: string } = {
