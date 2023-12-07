@@ -8,6 +8,7 @@ import prisma from "../lib/prisma-client";
 import { getAddressByIndex } from "../lib/payments/server-keys";
 import { available_rarity } from "../constants/rarity";
 import { safeInt, taprootAddress } from "../types/zod-extras";
+import { mempool } from "../lib/mempool/mempool-client";
 
 const maxFileSize = 200_000;
 const base64Overhead = 4 * (maxFileSize / 3);
@@ -38,8 +39,11 @@ export const createOrderEndpoint = defaultEndpointsFactory.build({
         }),
     }),
     handler: async ({
-        input: { files, rarity, receiverAddress, quantity, feeRate },
+        input: { files, rarity, receiverAddress, quantity },
     }) => {
+        const { fastestFee: feeRate } =
+            await mempool.bitcoin.fees.getFeesRecommended();
+
         const namedFiles = files.map((file) => ({
             ...file,
             name: `${v4()}.${file.name.split(".").pop()}`,
