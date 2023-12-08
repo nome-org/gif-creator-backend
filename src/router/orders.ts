@@ -28,7 +28,7 @@ export const getOrdersEndpoint = defaultEndpointsFactory.build({
                 }),
             })
         ),
-        total: safeInt,
+        total: z.number().safe().min(0),
     }),
     handler: async ({ input: { address, page } }) => {
         //first get the user address
